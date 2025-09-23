@@ -4,13 +4,17 @@ open MeasureTheory ProbabilityTheory Measure Function Complex
 
 open scoped ENNReal
 
-
-
 namespace ProbabilityTheory
 
 section Fintype
 
 variable {Ω : Type*} [MeasurableSpace Ω] {P : Measure Ω}
+
+lemma moment_def (X : Ω → ℝ) (p : ℕ) (μ : Measure Ω) :
+    moment X p μ = μ[X ^ p] := rfl
+
+lemma moment_one (X : Ω → ℝ) (μ : Measure Ω) :
+    moment X 1 μ = μ[X] := by simp [moment]
 
 variable {α : Type*} [MeasurableSpace α] [Fintype α] [MeasurableSingletonClass α]
 
@@ -147,8 +151,8 @@ variable {Ω : Type*} {mΩ : MeasurableSpace Ω} {P : Measure Ω} {X : Ω → �
 protected lemma HasLaw.real_bernoulli_def (hX : HasLaw X (real_bernoulli p) P) :
     HasLaw X ((count.withDensity (fin_bernoulli_PMF p)).map (↑)) P := hX
 
-theorem HasLaw.real_bernoulli_moment_eq_one (hp₀ : 0 ≤ p) (hp₁ : p ≤ 1)
-    (hX : HasLaw X (real_bernoulli p) P) (n : ℕ) (hn : 1 ≤ n) :
+theorem HasLaw.real_bernoulli_moment_eq_p (hp₀ : 0 ≤ p) (hp₁ : p ≤ 1)
+    (hX : HasLaw X (real_bernoulli p) P) {n : ℕ} (hn : 1 ≤ n) :
     moment X n P = p := by
   unfold moment
   conv in (X ^ n) => change (· ^ n) ∘ X
@@ -160,11 +164,16 @@ theorem HasLaw.real_bernoulli_moment_eq_one (hp₀ : 0 ≤ p) (hp₁ : p ≤ 1)
 theorem HasLaw.real_bernoulli_mean (hp₀ : 0 ≤ p) (hp₁ : p ≤ 1)
     (hX : HasLaw X (real_bernoulli p) P) :
     P[X] = p := by
-  sorry
+  rw [← moment_one, hX.real_bernoulli_moment_eq_p hp₀ hp₁ (by rfl)]
+
+#check isProbabilityMeasure_map
+#check MeasureTheory.Measure.isFiniteMeasure_map
 
 theorem HasLaw.real_bernoulli_variance (hp₀ : 0 ≤ p) (hp₁ : p ≤ 1)
     (hX : HasLaw X (real_bernoulli p) P) :
     Var[X; P] = p * (1 - p) := by
+  -- need to prove lemmas for premap `isProbabilityMeasure` and `isFiniteMeasure`
+  -- rw [variance_eq_sub]
   sorry
 
 end Bernoulli
