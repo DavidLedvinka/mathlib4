@@ -7,6 +7,7 @@ module
 
 public import Mathlib.Probability.Kernel.Composition.MeasureComp
 public import Mathlib.Probability.Kernel.IonescuTulcea.Traj
+public import Mathlib.Data.Set.FiniteExhaustion
 
 /-!
 # Infinite product of probability measures
@@ -56,6 +57,8 @@ open scoped ENNReal Topology
 namespace MeasureTheory
 
 section Preliminaries
+
+#check FiniteExhaustion.choice
 
 variable {ι : Type*} {X : ι → Type*} {mX : ∀ i, MeasurableSpace (X i)}
 variable (μ : (i : ι) → Measure (X i)) [hμ : ∀ i, IsProbabilityMeasure (μ i)]
@@ -409,6 +412,12 @@ lemma infinitePi_pi {s : Finset ι} {t : (i : ι) → Set (X i)}
   · rw [univ_eq_attach, prod_attach _ (fun i ↦ (μ i) (t i))]
   · exact measurable_restrict _
   · exact .univ_pi fun i ↦ mt i.1 i.2
+
+lemma infinitePi_pi_countable {s : Set ι} [Countable s] {t : (i : ι) → Set (X i)}
+    (mt : ∀ i ∈ s, MeasurableSet (t i)) :
+    infinitePi μ (Set.pi s t) = ∏' i : s, (μ i) (t i) := by
+    have K := FiniteExhaustion.choice s
+
 
 -- TODO: add a version for infinite `ι`. See TODO on `infinitePi_pi`.
 @[simp]
