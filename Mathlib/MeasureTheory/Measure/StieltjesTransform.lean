@@ -12,6 +12,8 @@ public import Mathlib
 # Stieltjes Transform of a Borel Measure
 -/
 
+@[expose] public section
+
 open MeasureTheory Metric Complex ComplexConjugate
 
 theorem complex_resolvent_def (z : ℂ) :
