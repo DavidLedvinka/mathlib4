@@ -62,4 +62,6 @@ example (p : ℝ) (h : 0 < p) : ∞ ^ p = ∞ := by simp [h]
 example (p : ℝ) (h : p = 0) : ∞ ^ p = 1 := by simp [h]
 example (p : ℝ) (h : p < 0) : ∞ ^ p = 0 := by simp [h]
 
-/- CAST STEP -/
+
+
+/- NORMALIZE STEP -/
