@@ -35,7 +35,7 @@ theorem poincare {T : E →ₗ[𝕜] E} (hT : T.IsSymmetric) (V : Submodule 𝕜
     simp only [map_sum, map_smul, inner_sum, sum_inner, inner_smul_right, inner_smul_left,
       comp_apply, mul_sum, smul_comm (c _), ← inner_self_eq_norm_sq (𝕜 := 𝕜), re_ofReal_mul,
       hT.apply_eigenvectorBasis, orthonormal_iff_ite.mp (hT.eigenvectorBasis hn).orthonormal]
-    gcongr with k _ k' _
+    gcongr
     · split_ifs with h
       · simp [mul_one, Subtype.coe_injective h, mul_conj]
       · simp
