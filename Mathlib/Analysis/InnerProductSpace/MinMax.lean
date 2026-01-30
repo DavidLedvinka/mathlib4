@@ -41,6 +41,9 @@ theorem poincare {T : E →ₗ[𝕜] E} (hT : T.IsSymmetric) (V : Submodule 𝕜
       · simp
     · apply hT.eigenvalues_antitone hn (by grind)
 
+#check IsGreatest
+#check IsLeast
+
 theorem minimax {T : E →L[𝕜] E} (hT : T.IsSymmetric) (i : Fin n) :
     hT.eigenvalues hn i =
       ⨆ (V : Submodule 𝕜 E) (hV : Module.finrank 𝕜 V = i),
