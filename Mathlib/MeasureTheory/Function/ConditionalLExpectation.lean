@@ -25,7 +25,7 @@ expectation `P⁻[X|mΩ]` of `X` is the `mΩ`-measurable function such that for 
 * `setLIntegral_condLExp`: For any `mΩ`-measurable set `s`,
   `∫⁻ ω in s, P⁻[X|mΩ] ω ∂P = ∫⁻ ω in s, X ω ∂P`.
 * `ae_eq_condLExp` : the conditional (Lebesgue) expectation is characterized by its (Lebesgue)
-  integral on `mΩ` sets up to `P`-ae equality.
+  integral on `mΩ`-measurable sets up to `P`-ae equality.
 
 ## Notation
 
