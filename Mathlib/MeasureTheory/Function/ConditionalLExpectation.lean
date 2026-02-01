@@ -94,7 +94,7 @@ meta def condLExpUnexpander : Lean.PrettyPrinter.Unexpander
 #check P⁻[X|mΩ] (sorry : Ω)
 
 theorem condLExp_of_not_le (hm_not : ¬mΩ ≤ mΩ₀) : P⁻[X|mΩ] = 0 := by
-    rw [condLExp, dif_neg hm_not]
+  rw [condLExp, dif_neg hm_not]
 
 theorem condLExp_of_not_sigmaFinite (hm : mΩ ≤ mΩ₀) (hμm_not : ¬SigmaFinite (P.trim hm)) :
     P⁻[X|mΩ] = 0 := by simp [condLExp, dif_pos hm, hμm_not]
