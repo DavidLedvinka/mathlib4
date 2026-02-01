@@ -170,7 +170,7 @@ theorem SeparatesPoints.mono {m m' : MeasurableSpace α} [hsep : @SeparatesPoint
     @SeparatesPoints.separates _ m hsep _ _ fun _ hs ↦ hxy _ (h _ hs)
 
 theorem _root_.eq_const_of_measurable_bot [MeasurableSpace β] [Nonempty β]
-    [hs : SeparatesPoints β] {f : α → β} (hf : Measurable[⊥] f) :
+    [SeparatesPoints β] {f : α → β} (hf : Measurable[⊥] f) :
     ∃ c, f = fun _ ↦ c := by
   have h (a₁ : α) (a₂ : α) : f a₁ = f a₂ := by
     by_contra! h
