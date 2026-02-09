@@ -194,7 +194,7 @@ There are four types of theorems that are used a bit differently.
     - Pi Theorem
     ```lean
     @[fun_prop]
-    theorem continuous_pi (f : X → α → Y) (hf : ∀ a, Continuous (f x a)) :
+    theorem continuous_pi (f : X → α → Y) (hf : ∀ a, Continuous (fun x ↦ f x a)) :
        Continuous (fun x a ↦ f x a) := ..
     ```
 
