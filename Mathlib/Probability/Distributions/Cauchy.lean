@@ -9,7 +9,9 @@ public import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
 
 /-! # Cauchy Distribution over ℝ
 
-Define the Cauchy distribution over the reals.
+Define the Cauchy distribution with location parameter `x₀` and scale parameter `γ`.
+
+Note that we use "location and "scale" to refer to these parameters in theorem names.
 
 ## Main definition
 
@@ -37,6 +39,11 @@ section CauchyPDF
 noncomputable def cauchyPDFReal (x₀ : ℝ) (γ : ℝ≥0) (x : ℝ) : ℝ :=
   .pi⁻¹ * γ * ((x - x₀) ^ 2 + γ ^ 2)⁻¹
 
+@[simp]
+lemma cauchyPDFReal_scale_zero (x₀ : ℝ) : cauchyPDFReal x₀ 0  = 0 := by
+  ext
+  simp [cauchyPDFReal]
+
 lemma cauchyPDFReal_def (x₀ : ℝ) (γ : ℝ≥0) (x : ℝ) :
     cauchyPDFReal x₀ γ x  = .pi⁻¹ * γ * ((x - x₀) ^ 2 + γ ^ 2)⁻¹ := by rfl
 
@@ -52,6 +59,11 @@ lemma cauchyPDFReal_def' (x₀ : ℝ) (γ : ℝ≥0) (x : ℝ) :
 /-- The pdf of the gamma distribution, as a function valued in `ℝ≥0∞`. -/
 noncomputable def cauchyPDF (x₀ : ℝ) (γ : ℝ≥0) (x : ℝ) : ℝ≥0∞ :=
   ENNReal.ofReal (cauchyPDFReal x₀ γ x)
+
+@[simp]
+lemma cauchyPDF_scale_zero (x₀ : ℝ) : cauchyPDF x₀ 0 = 0 := by
+  ext
+  simp [cauchyPDF]
 
 lemma cauchyPDF_def (x₀ : ℝ) (γ : ℝ≥0) (x : ℝ) :
   cauchyPDF x₀ γ x = ENNReal.ofReal (cauchyPDFReal x₀ γ x) := by rfl
@@ -87,10 +99,13 @@ lemma integral_cauchyPDFReal (x₀ : ℝ) {γ : ℝ≥0} (hγ : γ ≠ 0) :
   field
 
 @[fun_prop]
-lemma integrable_cauchyPDFReal (x₀ : ℝ) {γ : ℝ≥0} (hγ : γ ≠ 0) :
+lemma integrable_cauchyPDFReal (x₀ : ℝ) {γ : ℝ≥0}  :
     Integrable (cauchyPDFReal x₀ γ) := by
+  by_cases! h : γ = 0
+  · simp only [h, cauchyPDFReal_scale_zero]
+    exact integrable_zero _ _ _
   apply Integrable.of_integral_ne_zero
-  simp [integral_cauchyPDFReal, hγ]
+  simp [h, integral_cauchyPDFReal]
 
 /-- The pdf of the cauchy distribution integrates to 1 -/
 @[simp]
