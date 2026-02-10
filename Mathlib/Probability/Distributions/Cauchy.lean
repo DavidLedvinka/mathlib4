@@ -14,7 +14,7 @@ import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
 
 Define the Cauchy distribution with location parameter `x₀` and scale parameter `γ`.
 
-Note that we use "location and "scale" to refer to these parameters in theorem names.
+Note that we use "location" and "scale" to refer to these parameters in theorem names.
 
 ## Main definition
 
