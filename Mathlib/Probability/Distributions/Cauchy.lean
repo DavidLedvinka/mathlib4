@@ -100,8 +100,7 @@ lemma lintegral_cauchyPDF_eq_one (x₀ : ℝ) {γ : ℝ≥0} (hγ : γ ≠ 0) :
     ∫⁻ x, cauchyPDF x₀ γ x = 1 := by
   unfold cauchyPDF
   rw [← ENNReal.toReal_eq_one_iff, ← integral_eq_lintegral_of_nonneg_ae
-    (by filter_upwards with x; simpa using by positivity [cauchyPDF_pos x₀ hγ x])
-    (by fun_prop), integral_cauchyPDFReal x₀ hγ]
+    (ae_of_all _ fun x ↦ (cauchyPDF_pos x₀ hγ x).le) (by fun_prop), integral_cauchyPDFReal x₀ hγ]
 
 end CauchyPDF
 
