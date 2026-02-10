@@ -94,7 +94,7 @@ lemma integrable_cauchyPDFReal (x₀ : ℝ) {γ : ℝ≥0} (hγ : γ ≠ 0) :
   apply Integrable.of_integral_ne_zero
   simp [integral_cauchyPDFReal, hγ]
 
-/-- The pdf of the cauchy distribution integrates to 1 -/
+/-- The pdf of the cauchy distribution integrates to 1. -/
 @[simp]
 lemma lintegral_cauchyPDF_eq_one (x₀ : ℝ) {γ : ℝ≥0} (hγ : γ ≠ 0) :
     ∫⁻ x, cauchyPDF x₀ γ x = 1 := by
