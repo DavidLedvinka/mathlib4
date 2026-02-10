@@ -5,7 +5,10 @@ Authors: David Ledvinka
 -/
 module
 
-public import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
+public import Mathlib.MeasureTheory.Integral.Bochner.Basic
+public import Mathlib.MeasureTheory.Measure.Haar.OfBasis
+
+import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
 
 /-! # Cauchy Distribution over ℝ
 
@@ -52,8 +55,7 @@ lemma cauchyPDFReal_def' (x₀ : ℝ) (γ : ℝ≥0) (x : ℝ) :
   rw [cauchyPDFReal_def]
   by_cases h : γ = 0
   · simp [h]
-  field_simp
-  simp [mul_comm, ← mul_assoc]
+  simp
   field
 
 /-- The pdf of the gamma distribution, as a function valued in `ℝ≥0∞`. -/
@@ -107,14 +109,13 @@ lemma integrable_cauchyPDFReal (x₀ : ℝ) {γ : ℝ≥0}  :
   apply Integrable.of_integral_ne_zero
   simp [h, integral_cauchyPDFReal]
 
-/-- The pdf of the cauchy distribution integrates to 1 -/
+/-- The pdf of the cauchy distribution integrates to 1. -/
 @[simp]
 lemma lintegral_cauchyPDF_eq_one (x₀ : ℝ) {γ : ℝ≥0} (hγ : γ ≠ 0) :
     ∫⁻ x, cauchyPDF x₀ γ x = 1 := by
   unfold cauchyPDF
   rw [← ENNReal.toReal_eq_one_iff, ← integral_eq_lintegral_of_nonneg_ae
-    (by filter_upwards with x; simpa using by positivity [cauchyPDF_pos x₀ hγ x])
-    (by fun_prop), integral_cauchyPDFReal x₀ hγ]
+    (ae_of_all _ fun x ↦ (cauchyPDF_pos x₀ hγ x).le) (by fun_prop), integral_cauchyPDFReal x₀ hγ]
 
 end CauchyPDF
 
