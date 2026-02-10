@@ -5,7 +5,10 @@ Authors: David Ledvinka
 -/
 module
 
-public import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
+public import Mathlib.MeasureTheory.Integral.Bochner.Basic
+public import Mathlib.MeasureTheory.Measure.Haar.OfBasis
+
+import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
 
 /-! # Cauchy Distribution over ℝ
 
