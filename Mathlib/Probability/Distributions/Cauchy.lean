@@ -101,7 +101,7 @@ lemma integral_cauchyPDFReal (x₀ : ℝ) {γ : ℝ≥0} (hγ : γ ≠ 0) :
   field
 
 @[fun_prop]
-lemma integrable_cauchyPDFReal (x₀ : ℝ) {γ : ℝ≥0}  :
+lemma integrable_cauchyPDFReal (x₀ : ℝ) {γ : ℝ≥0} :
     Integrable (cauchyPDFReal x₀ γ) := by
   by_cases! h : γ = 0
   · simp only [h, cauchyPDFReal_scale_zero]
