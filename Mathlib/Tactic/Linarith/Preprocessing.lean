@@ -389,7 +389,7 @@ def removeNe : GlobalBranchingPreprocessor where
   transform := removeNe_aux
 end removeNe
 
-/- Temporary Definition -/
+/-- Definition overided in `Mathlib.Tactic.Linarith.NNRealPreprocessor`. -/
 initialize nnRealToRealTransform : IO.Ref (MVarId → List Expr → MetaM (List Branch)) ← do
   IO.mkRef (fun g l ↦ pure [(g, l)])
 

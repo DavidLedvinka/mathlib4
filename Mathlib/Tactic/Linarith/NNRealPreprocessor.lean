@@ -1,6 +1,13 @@
-import Mathlib.Tactic.Linarith
-import Mathlib.Data.NNReal.Basic
-import Mathlib.Tactic.Rify
+/-
+Copyright (c) 2018 David Ledvinka. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: David Ledvinka, Heather Macbeth
+-/
+module
+
+public meta import Mathlib.Tactic.Linarith
+public meta import Mathlib.Tactic.Rify
+public import Mathlib.Data.NNReal.Basic
 
 public meta section
 
@@ -19,14 +26,14 @@ or the negation thereof.
 partial def isNNRealProp (e : Expr) : MetaM Bool := succeeds do
   let (_, _, .const ``NNReal [], _, _) ← e.ineqOrNotIneq? | failure
 
-/-- If `e` is of the form `((n : ℝ≥0) : C)`, `NNReal.toReal e` returns `⟨n, C⟩`. -/
+/-- If `e` is of the form `((x : ℝ≥0) : ℝ)`, `NNReal.toReal e` returns `x`. -/
 def isNNRealtoReal (e : Expr) : Option Expr :=
   match e with
   | .app (.const ``NNReal.toReal _) n => some n
   | _ => none
 
 /--
-`getNatComparisons e` returns a list of all subexpressions of `e` of the form `((t : ℝ≥0) : C)`.
+`getNNRealComparisons e` returns a list of all subexpressions of `e` of the form `(x : ℝ)`.
 -/
 partial def getNNRealComparisons (e : Expr) : List Expr :=
   match isNNRealtoReal e with
@@ -38,7 +45,7 @@ partial def getNNRealComparisons (e : Expr) : List Expr :=
     | (``Neg.neg, #[_, _, a]) => getNNRealComparisons a
     | _ => []
 
-/-- If `e : ℝ≥0`, returns a proof of `0 ≤ (e : C)`. -/
+/-- If `e : ℝ≥0`, returns a proof of `0 ≤ (e : ℝ)`. -/
 def mk_toReal_nonneg_prf (e : Expr) : MetaM (Option Expr) :=
   try commitIfNoEx (mkAppM ``NNReal.coe_nonneg #[e])
   catch e => do
