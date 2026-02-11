@@ -30,7 +30,7 @@ Note that we use "location" and "scale" to refer to these parameters in theorem 
 
 @[expose] public section
 
-open scoped ENNReal NNReal
+open scoped Real ENNReal NNReal
 
 open MeasureTheory Measure
 
@@ -40,7 +40,7 @@ section CauchyPDF
 
 /-- The pdf of the cauchy distribution depending on its location `x₀` and scale `γ` parameters. -/
 noncomputable def cauchyPDFReal (x₀ : ℝ) (γ : ℝ≥0) (x : ℝ) : ℝ :=
-  .pi⁻¹ * γ * ((x - x₀) ^ 2 + γ ^ 2)⁻¹
+  π⁻¹ * γ * ((x - x₀) ^ 2 + γ ^ 2)⁻¹
 
 @[simp]
 lemma cauchyPDFReal_scale_zero (x₀ : ℝ) : cauchyPDFReal x₀ 0 = 0 := by
@@ -48,10 +48,10 @@ lemma cauchyPDFReal_scale_zero (x₀ : ℝ) : cauchyPDFReal x₀ 0 = 0 := by
   simp [cauchyPDFReal]
 
 lemma cauchyPDFReal_def (x₀ : ℝ) (γ : ℝ≥0) (x : ℝ) :
-    cauchyPDFReal x₀ γ x  = .pi⁻¹ * γ * ((x - x₀) ^ 2 + γ ^ 2)⁻¹ := by rfl
+    cauchyPDFReal x₀ γ x = π⁻¹ * γ * ((x - x₀) ^ 2 + γ ^ 2)⁻¹ := by rfl
 
 lemma cauchyPDFReal_def' (x₀ : ℝ) (γ : ℝ≥0) (x : ℝ) :
-    cauchyPDFReal x₀ γ x = .pi⁻¹ * γ⁻¹ * (1 + ((x - x₀) / γ) ^ 2)⁻¹ := by
+    cauchyPDFReal x₀ γ x = π⁻¹ * γ⁻¹ * (1 + ((x - x₀) / γ) ^ 2)⁻¹ := by
   rw [cauchyPDFReal_def]
   by_cases h : γ = 0
   · simp [h]
