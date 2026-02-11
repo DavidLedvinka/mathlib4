@@ -184,7 +184,6 @@ structure PreprocessorBase : Type where
   name : Name := by exact decl_name%
   /-- The description of the preprocessor. -/
   description : String
-  deriving Nonempty
 
 /--
 A preprocessor transforms a proof of a proposition into a proof of a different proposition.
@@ -225,7 +224,6 @@ structure GlobalBranchingPreprocessor : Type extends PreprocessorBase where
   /-- Given a goal, and a list of hypotheses,
   produce a list of pairs (consisting of a goal and list of hypotheses). -/
   transform : MVarId → List Expr → MetaM (List Branch)
-  deriving Nonempty
 
 /--
 A `Preprocessor` lifts to a `GlobalPreprocessor` by folding it over the input list.
