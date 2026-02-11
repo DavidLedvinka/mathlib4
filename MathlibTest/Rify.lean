@@ -3,6 +3,8 @@ import Mathlib.Tactic.Linarith.NNRealPreprocessor
 
 set_option linter.unusedVariables false
 
+set_option trace.linarith true
+
 example {n : ℕ} {k : ℤ} (hn : 8 ≤ n) (hk : 2 * k ≤ n + 2) :
     (0 : ℝ) < n - k - 1 := by
   rify at hn hk
