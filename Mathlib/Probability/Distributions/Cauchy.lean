@@ -43,7 +43,7 @@ noncomputable def cauchyPDFReal (x₀ : ℝ) (γ : ℝ≥0) (x : ℝ) : ℝ :=
   .pi⁻¹ * γ * ((x - x₀) ^ 2 + γ ^ 2)⁻¹
 
 @[simp]
-lemma cauchyPDFReal_scale_zero (x₀ : ℝ) : cauchyPDFReal x₀ 0  = 0 := by
+lemma cauchyPDFReal_scale_zero (x₀ : ℝ) : cauchyPDFReal x₀ 0 = 0 := by
   ext
   simp [cauchyPDFReal]
 
