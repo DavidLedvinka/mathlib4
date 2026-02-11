@@ -13,7 +13,7 @@ public import Mathlib.Data.NNReal.Basic
 /-!
 # `rify` tactic
 
-The `rify` tactic is used to shift propositions from `ℕ`, `ℤ` or `ℚ` to `ℝ`.
+The `rify` tactic is used to shift propositions from `ℕ`, `ℤ`, `ℚ` or `ℝ≥0` to `ℝ`.
 
 Although less useful than its cousins `zify` and `qify`, it can be useful when your
 goal or context already involves real numbers.
