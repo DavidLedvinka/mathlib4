@@ -18,7 +18,7 @@ Note that we use "location" and "scale" to refer to these parameters in theorem 
 
 ## Main definition
 
-* `cauchyPDFReal`: the function `x₀ γ x ↦ .pi⁻¹ * γ * ((x - x₀) ^ 2 + γ ^ 2)⁻¹`,
+* `cauchyPDFReal`: the function `x₀ γ x ↦ π⁻¹ * γ * ((x - x₀) ^ 2 + γ ^ 2)⁻¹`,
   which is the probability density function of a Cauchy distribution with location parameter `x₀`
   and scale parameter `γ` (when `γ ≠ 0`).
 * `cauchyPDF`: `ℝ≥0∞`-valued pdf, `cauchyPDF μ v x = ENNReal.ofReal (cauchyPDFReal μ v x)`.
