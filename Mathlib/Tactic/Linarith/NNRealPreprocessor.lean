@@ -56,25 +56,26 @@ def mk_toReal_nonneg_prf (e : Expr) : MetaM (Option Expr) :=
     trace[linarith] "Got exception when using `coe_nonneg` {e.toMessageData}"
     return none
 
-initialize nnRealToRealTransform.set fun g l => do
-    let l ← l.mapM fun h => do
-      let t ← whnfR (← instantiateMVars (← inferType h))
-      if ← isNNRealProp t then
-        let (some (h', t'), _) ← Term.TermElabM.run' (run_for g (rifyProof none h t))
-          | throwError "rifyProof failed on {h}"
-        if ← succeeds t'.ineqOrNotIneq? then
-          pure h'
-        else
-          pure h
+initialize nnrealToRealTransform.set fun l => do
+  let l ← l.mapM fun e => do
+    let t ← whnfR (← instantiateMVars (← inferType e))
+    if ← isNNRealProp t then
+      let g ← mkFreshExprMVar e
+      let (some (e', t'), _) ← Term.TermElabM.run' (run_for g.mvarId! (rifyProof none e t))
+        | throwError "rifyProof failed on {e}"
+      if ← succeeds t'.ineqOrNotIneq? then
+        pure e'
       else
-        pure h
-    let atoms : List Expr ← withNewMCtxDepth <| AtomM.run .reducible do
-      for h in l do
-        let (_, _, a, b) ← (← inferType h).ineq?
-        discard <| (getNNRealCoes a).mapM AtomM.addAtom
-        discard <| (getNNRealCoes b).mapM AtomM.addAtom
-      pure (← get).atoms.toList
-    let nonneg_pfs : List Expr ← atoms.filterMapM mk_toReal_nonneg_prf
-    pure [(g, nonneg_pfs ++ l)]
+        pure e
+    else
+      pure e
+  let atoms : List Expr ← withNewMCtxDepth <| AtomM.run .reducible do
+    for e in l do
+      let (_, _, a, b) ← (← inferType e).ineq?
+      discard <| (getNNRealCoes a).mapM AtomM.addAtom
+      discard <| (getNNRealCoes b).mapM AtomM.addAtom
+    return (← get).atoms.toList
+  let nonneg_pfs : List Expr ← atoms.filterMapM mk_toReal_nonneg_prf
+  return nonneg_pfs ++ l
 
 end  Mathlib.Tactic.Linarith
