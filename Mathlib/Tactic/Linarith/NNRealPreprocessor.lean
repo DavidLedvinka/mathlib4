@@ -10,14 +10,17 @@ public meta import Mathlib.Tactic.Rify
 public import Mathlib.Data.NNReal.Basic
 
 /-!
-# TODO Docstring
+# NNReal linarith preprocessing
+
+This file contains a `linarith` preprocessor for converting (in)equalities in `ℝ≥0` to `ℝ`.
+
+By overriding the behaviour of the placeholder preprocessor `nnrealToReal` (which does nothing
+unless this file is imported) `linarith` can still be used without importing `NNReal`.
 -/
 
 public meta section
 
 namespace Mathlib.Tactic.Linarith
-
-/-! ### Preprocessing -/
 
 open Lean Std TreeSet
 open Elab Tactic Meta
@@ -60,9 +63,7 @@ initialize nnrealToRealTransform.set fun l => do
   let l ← l.mapM fun e => do
     let t ← whnfR (← instantiateMVars (← inferType e))
     if ← isNNRealProp t then
-      let g ← mkFreshExprMVar e
-      let (some (e', t'), _) ← Term.TermElabM.run' (run_for g.mvarId! (rifyProof none e t))
-        | throwError "rifyProof failed on {e}"
+      let (e', t') ← rifyProof e t
       if ← succeeds t'.ineqOrNotIneq? then
         pure e'
       else

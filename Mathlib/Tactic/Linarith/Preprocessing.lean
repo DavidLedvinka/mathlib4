@@ -390,8 +390,7 @@ def removeNe : GlobalBranchingPreprocessor where
 end removeNe
 
 /-- Definition overidden in `Mathlib.Tactic.Linarith.NNRealPreprocessor`. -/
-initialize nnrealToRealTransform : IO.Ref (List Expr → MetaM (List Expr)) ← do
-  IO.mkRef (fun l ↦ pure l)
+initialize nnrealToRealTransform : IO.Ref (List Expr → MetaM (List Expr)) ← IO.mkRef pure
 /--
 If `h` is an equality or inequality between NNReals, `natToNNReal` lifts this inequality to the
 NNReals. It also adds the facts that the reals involved are nonnegative. To avoid adding the same
