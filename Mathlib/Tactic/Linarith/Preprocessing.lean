@@ -124,6 +124,7 @@ partial def getNatComparisons (e : Expr) : List (Expr × Expr) :=
     | (``HAdd.hAdd, #[_, _, _, _, a, b]) => getNatComparisons a ++ getNatComparisons b
     | (``HMul.hMul, #[_, _, _, _, a, b]) => getNatComparisons a ++ getNatComparisons b
     | (``HSub.hSub, #[_, _, _, _, a, b]) => getNatComparisons a ++ getNatComparisons b
+    | (``HDiv.hDiv, #[_, _, _, _, a, b]) => getNatComparisons a ++ getNatComparisons b
     | (``Neg.neg, #[_, _, a]) => getNatComparisons a
     | _ => []
 
