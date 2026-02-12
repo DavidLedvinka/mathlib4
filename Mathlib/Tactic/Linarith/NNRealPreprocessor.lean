@@ -1,13 +1,17 @@
 /-
 Copyright (c) 2018 David Ledvinka. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: David Ledvinka, Heather Macbeth
+Authors: David Ledvinka
 -/
 module
 
 public meta import Mathlib.Tactic.Linarith
 public meta import Mathlib.Tactic.Rify
 public import Mathlib.Data.NNReal.Basic
+
+/-!
+# TODO Docstring
+-/
 
 public meta section
 
@@ -35,14 +39,14 @@ def isNNRealtoReal (e : Expr) : Option Expr :=
 /--
 `getNNRealComparisons e` returns a list of all subexpressions of `e` of the form `(x : ℝ)`.
 -/
-partial def getNNRealComparisons (e : Expr) : List Expr :=
+partial def getNNRealCoes (e : Expr) : List Expr :=
   match isNNRealtoReal e with
   | some x => [x]
   | none => match e.getAppFnArgs with
-    | (``HAdd.hAdd, #[_, _, _, _, a, b]) => getNNRealComparisons a ++ getNNRealComparisons b
-    | (``HMul.hMul, #[_, _, _, _, a, b]) => getNNRealComparisons a ++ getNNRealComparisons b
-    | (``HSub.hSub, #[_, _, _, _, a, b]) => getNNRealComparisons a ++ getNNRealComparisons b
-    | (``Neg.neg, #[_, _, a]) => getNNRealComparisons a
+    | (``HAdd.hAdd, #[_, _, _, _, a, b]) => getNNRealCoes a ++ getNNRealCoes b
+    | (``HMul.hMul, #[_, _, _, _, a, b]) => getNNRealCoes a ++ getNNRealCoes b
+    | (``HSub.hSub, #[_, _, _, _, a, b]) => getNNRealCoes a ++ getNNRealCoes b
+    | (``Neg.neg, #[_, _, a]) => getNNRealCoes a
     | _ => []
 
 /-- If `e : ℝ≥0`, returns a proof of `0 ≤ (e : ℝ)`. -/
@@ -64,18 +68,13 @@ initialize nnRealToRealTransform.set fun g l => do
           pure h
       else
         pure h
-    withNewMCtxDepth <| AtomM.run .reducible do
-    let nonnegs ← l.foldlM (init := ∅) fun (es : TreeSet ℕ) h => do
-      try
+    let atoms : List Expr ← withNewMCtxDepth <| AtomM.run .reducible do
+      for h in l do
         let (_, _, a, b) ← (← inferType h).ineq?
-        let getIndex (e : Expr) : AtomM ℕ := return (← AtomM.addAtom e).1
-        let indices_a ← (getNNRealComparisons a).mapM getIndex
-        let indices_b ← (getNNRealComparisons b).mapM getIndex
-        pure <| (es.insertMany indices_a).insertMany indices_b
-      catch _ => pure es
-    let atoms : Array Expr := (← get).atoms
-    let nonneg_pfs : List Expr ← nonnegs.toList.filterMapM fun n => do
-      mk_toReal_nonneg_prf atoms[n]!
+        discard <| (getNNRealCoes a).mapM AtomM.addAtom
+        discard <| (getNNRealCoes b).mapM AtomM.addAtom
+      pure (← get).atoms.toList
+    let nonneg_pfs : List Expr ← atoms.filterMapM mk_toReal_nonneg_prf
     pure [(g, nonneg_pfs ++ l)]
 
 end  Mathlib.Tactic.Linarith
