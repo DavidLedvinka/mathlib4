@@ -393,7 +393,7 @@ end removeNe
 initialize nnrealToRealTransform : IO.Ref (List Expr → MetaM (List Expr)) ← IO.mkRef pure
 /--
 If `h` is an equality or inequality between NNReals, `natToNNReal` lifts this inequality to the
-NNReals. It also adds the facts that the reals involved are nonnegative. To avoid adding the same
+Reals. It also adds the facts that the reals involved are nonnegative. To avoid adding the same
 nonnegativity facts many times, it is a global preprocessor. This preprocessor does nothing unless
 `Mathlib.Tactic.Linarith.NNRealPreprocessor` is imported -/
 def nnrealToReal : GlobalPreprocessor where
