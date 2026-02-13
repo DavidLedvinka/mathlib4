@@ -64,10 +64,9 @@ initialize nnrealToRealTransform.set fun l => do
   let l ← l.mapM fun e => do
     let t ← whnfR (← instantiateMVars (← inferType e))
     if ← isNNRealProp t then
-      let (e', t') ← rifyProof e t
-      pure e'
+      return (← rifyProof e t).1
     else
-      pure e
+      return e
   let atoms : List Expr ← withNewMCtxDepth <| AtomM.run .reducible do
     for e in l do
       let (_, _, a, b) ← (← inferType e).ineq?

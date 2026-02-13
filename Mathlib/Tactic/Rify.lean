@@ -106,11 +106,4 @@ def rifyProof (proof : Expr) (prop : Expr) : MetaM (Expr × Expr) := do
 @[rify_simps] lemma toReal_lt (a b : ℝ≥0) : a < b ↔ (a : ℝ) < (b : ℝ) := by simp
 @[rify_simps] lemma toReal_ne (a b : ℝ≥0) : a ≠ b ↔ (a : ℝ) ≠ (b : ℝ) := by simp
 
-@[norm_cast] theorem NNReal.toNNReal_sub_of_add_le {a b c : ℝ≥0} (h : a + c ≤ b) :
-    ((b - a : ℝ≥0) : ℝ) = b - a :=
-  NNReal.coe_sub <| (self_le_add_right _ c).trans h
-
-@[norm_cast] theorem NNReal.toNNReal_sub_of_lt {a b : ℝ≥0} (h : a < b) :
-    ((b - a : ℝ≥0) : ℝ) = b - a := NNReal.coe_sub h.le
-
 end Mathlib.Tactic.Rify
