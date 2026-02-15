@@ -59,6 +59,11 @@ def FunctionData.domainType (f : FunctionData) : MetaM Expr :=
   withLCtx f.lctx f.insts do
     inferType f.mainVar
 
+/-- **TODO: DELETE OR KEEP!** Codomain type of `f`. -/
+def FunctionData.codomainType (f : FunctionData) : MetaM Expr :=
+  withLCtx f.lctx f.insts do
+    inferType (Mor.mkAppN f.fn f.args)
+
 /-- Is head function of `f` a constant?
 
 If the head of `f` is a projection return the name of corresponding projection function. -/

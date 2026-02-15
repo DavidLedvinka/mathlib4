@@ -96,3 +96,7 @@ example {α : Type*} {m₀ : MeasurableSpace α} {μ : MeasureTheory.Measure α}
     (hl : ∀ f ∈ l, MeasureTheory.AEStronglyMeasurable f μ) :
     MeasureTheory.AEStronglyMeasurable l.prod μ := by
   fun_prop (disch := assumption)
+
+example :
+    Continuous (let g : ℝ → ℝ := fun x => x; g) := by
+  fun_prop
