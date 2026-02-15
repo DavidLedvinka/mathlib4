@@ -287,6 +287,8 @@ def MaybeFunctionData.get' (fData : MaybeFunctionData) : MetaM Expr :=
   | .letE f | .lam f => pure f
   | .data d => d.toExpr
 
+/-- **START AT:** `getFunctiondata` (about to get technical) -/
+
 /- # Types? -/
 
 structure FunPropDecl' where
