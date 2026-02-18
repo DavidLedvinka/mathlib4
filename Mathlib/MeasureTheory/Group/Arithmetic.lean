@@ -119,12 +119,17 @@ theorem Measurable.mul [MeasurableMul₂ M] (hf : Measurable f) (hg : Measurable
     Measurable fun a => f a * g a :=
   measurable_mul.comp (hf.prodMk hg)
 
-/-- Compositional version of `Measurable.mul` for use by `fun_prop`. -/
-@[to_additive (attr := fun_prop)
-/-- Compositional version of `Measurable.add` for use by `fun_prop`. -/]
-lemma Measurable.mul' [MeasurableMul₂ M] {f g : α → β → M} {h : α → β} (hf : Measurable ↿f)
-    (hg : Measurable ↿g) (hh : Measurable h) : Measurable fun a ↦ (f a * g a) (h a) := by
-  dsimp; fun_prop
+@[to_additive (attr := fun_prop)]
+theorem Measurable.mul' [MeasurableMul₂ M] (hf : Measurable f) (hg : Measurable g) :
+    Measurable (f * g) :=
+  measurable_mul.comp (hf.prodMk hg)
+
+-- /-- Compositional version of `Measurable.mul` for use by `fun_prop`. -/
+-- @[to_additive (attr := fun_prop)
+-- /-- Compositional version of `Measurable.add` for use by `fun_prop`. -/]
+-- lemma Measurable.mul' [MeasurableMul₂ M] {f g : α → β → M} {h : α → β} (hf : Measurable ↿f)
+--     (hg : Measurable ↿g) (hh : Measurable h) : Measurable fun a ↦ (f a * g a) (h a) := by
+--   dsimp; fun_prop
 
 @[to_additive (attr := fun_prop)]
 theorem AEMeasurable.mul' [MeasurableMul₂ M] (hf : AEMeasurable f μ) (hg : AEMeasurable g μ) :

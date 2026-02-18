@@ -59,10 +59,17 @@ def FunctionData.domainType (f : FunctionData) : MetaM Expr :=
   withLCtx f.lctx f.insts do
     inferType f.mainVar
 
-/-- Domain type of `f`. -/
+/-- Codomain type of `f`. -/
 def FunctionData.codomainType (f : FunctionData) : MetaM Expr :=
   withLCtx f.lctx f.insts do
     inferType (Mor.mkAppN f.fn f.args)
+
+/-- Is the codomain of `f` a subtype? -/
+def FunctionData.isToSubtype (f : FunctionData) : MetaM Bool :=
+  withLCtx f.lctx f.insts do
+    match (← whnf (← inferType (Mor.mkAppN f.fn f.args))).getAppFn with
+    | .const `Subtype _ => return true
+    | _ => return false
 
 /-- Is head function of `f` a constant?
 
@@ -215,7 +222,7 @@ def FunctionData.peeloffArgDecomposition (fData : FunctionData) : MetaM (Option 
     let gBody' := if let some coe := yₙ.coe then coe.app gBody' else gBody'
     let g' ← mkLambdaFVars #[x] gBody'
     let f' := Expr.lam `f (← inferType gBody') (.app (.bvar 0) (yₙ.expr)) default
-    return (f', g')
+    return (f',g')
 
 
 /-- Decompose function `f = (← fData.toExpr)` into composition of two functions.
@@ -253,7 +260,6 @@ def FunctionData.nontrivialDecomposition (fData : FunctionData) : MetaM (Option 
       yVals := yVals.push yVal'
       args := args.set! argId ⟨yVar, yVal.coe⟩
 
-    -- Perhaps I should try to understand this better!
     let g  ← withLCtx lctx insts do
       mkLambdaFVars #[x] (← mkProdElem yVals)
     let f ← withLCtx lctx insts do

@@ -234,3 +234,14 @@ example {α : Type*} [MeasurableSpace α] {p q : α → Prop} (hp : Measurable p
 example {α ι : Type*} [MeasurableSpace α] [Countable ι] {p : ι → α → Prop}
     (hp : ∀ i, Measurable (p i)) : Measurable fun x => ∀ i, p i x := by
   fun_prop
+
+/- David Ledvinka's Testing -/
+
+set_option trace.Meta.Tactic.fun_prop true
+--set_option pp.all true
+
+theorem add'' {f g : ℝ → ℝ} (hf : Measurable f) (hg : Measurable g) :
+    Measurable (fun x => f x + g x) := by fun_prop
+
+theorem add''' {f g : ℝ → ℝ} (hf : Measurable f) (hg : Measurable g) :
+    Measurable (f + g) := by fun_prop

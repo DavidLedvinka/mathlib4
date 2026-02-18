@@ -201,6 +201,23 @@ def mkAppN' (f : Expr) (xs : Array Arg) : Expr :=
 
 end Mor
 
+section ToBatteries
+
+/-
+
+`etaExpand1 (f : Expr) : MetaM Expr`
+====================================
+
+Eta expand `f` in only one variable and reduce in others:
+
+f ==> fun x ↦ f x
+fun x y ↦ f x y ==> fun x => f x
+HAdd.hAdd y ==> fun x ↦ HAdd.hAdd y x
+HAdd.hAdd ==> fun x ↦ HAdd.hAdd x
+-/
+
+end ToBatteries
+
 /- # Function Data -/
 
 /- Structure storing parts of a function in funProp-normal form. -/
@@ -437,9 +454,38 @@ def FunctionData.nontrivialDecomposition' (fData : FunctionData) :
     return none
   return (f, g)
 
-/- REVIEW DOCUMENTATION (NEXT UP!!!) -/
+/- Decompose function `fun x ↦ f y₁ ... yₙ` over specified argument indices `#[i, j, ...]`.
+
+The result is:
+` (fun (yᵢ', yⱼ', ...) ↦ f y₁ .. yᵢ' .. yⱼ' .. yₙ) ∘ (fun x ↦ (yᵢ, yₖ, ...))
+
+This is not possible if `yₗ` for `l ∉ #[i,j,...]` still contains `x`.
+In such case `none` is returned.
+-/
 def FunctionData.decompositionOverArgs' (fData : FunctionData) (args : Array Nat) :
-  MetaM (Option (Expr × Expr)) := do sorry
+    MetaM (Option (Expr × Expr)) := do
+  -- check if `fData.mainArgs` is an ordered subset of `args` (all the variables that our
+  -- function depends on must be included )
+  unless isOrderedSubsetOf fData.mainArgs args do return none
+  -- what does this do?
+  unless ¬(fData.fn.containsFVar fData.mainVar.fvarId!) do return none
+
+  withLCtx fData.lctx fData.insts do
+    -- Map `args` to its array of expressions (the arguments)
+    let gxs := args.map (fun i => fData.args[i]!.expr)
+
+    try
+      let gx ← mkProdElem gxs -- this can crash if we have dependent types
+      let g ← withLCtx fData.lctx fData.insts <| mkLambdaFVars #[fData.mainVar] gx
+      -- Making f
+      withLocalDeclD `y (← inferType gx) fun y => do
+        let ys ← mkProdSplitElem y gxs.size
+        let args' := (args.zip ys).foldl (init := fData.args)
+            (fun args' (i,y) => args'.set! i { expr := y, coe := args'[i]!.coe })
+        let f ← mkLambdaFVars #[y] (Mor.mkAppN fData.fn args')
+        return (f, g)
+    catch _ =>
+      return none
 
 /- # Types? -/
 
@@ -557,12 +603,74 @@ def funPropTac' : Tactic
 
 /-  `Elab` also contains a command that prints all function properties attached to a function. -/
 
+section Theorems
+
+/- Exploring **Theorems** -/
+
+end Theorems
+
+section Core
+
+
+/- Exploring **Core**  -/
+
+/- **NEED:** `tryTheoremWithHint?`, `tryTheorem?` and `getLambdaTheorems` -/
+
+/- Try to apply `rules` -/
+
+/-
+Try to prove `e` using the *identity lambda theorem*.
+
+For example, `e = q(Continuous fun x ↦ x)` and `funPropDecl` is `FunPropDecl` for `Continuous`
+-/
+def applyIdRule' (funPropDecl : FunPropDecl) (e : Expr)
+    (funProp : Expr → FunPropM (Option Result)) : FunPropM (Option Result) := do
+  let thms ← getLambdaTheorems funPropDecl.funPropName .id
+  if thms.size = 0 then
+    let msg := s!"missing identity rule to prove `{← ppExpr e}`"
+    logError msg
+    trace[Meta.Tactic.fun_prop] msg
+    return none
+  for thm in thms do
+    if let some r ← tryTheoremWithHint? e (.decl thm.thmName) #[] funProp then
+      return r
+  return none
+
+/-
+Try to prove `e` using the *constant lambda theorem*
+
+For example, `e = q(Continuous fun x ↦ y)` and `funPropDecl` is `FunPropDecl` for `Continuous`
+-/
+def applyConstRule' (funPropDecl : FunPropDecl) (e : Expr)
+    (funProp : Expr → FunPropM (Option Result)) : FunPropM (Option Result) := do
+  let thms ← getLambdaTheorems funPropDecl.funPropName .const
+  if thms.size = 0 then
+    let msg := s!"missing constant rule to prove `{← ppExpr e}`"
+    logError msg
+    trace[Meta.Tactic.fun_prop] msg
+    return none
+  for thm in thms do
+    let .const := thm.thmArgs | return none
+    if let some r ← tryTheorem? e (.decl thm.thmName) funProp then
+      return r
+  return none
+
+/-
+Try to prove `e` using the *apply lambda theorem*
+
+For example
+-/
+
 /- **NEXT"** `funProp` (THE MEAT!) -/
 
 /- Cache result if it does not have any subgoals -/
 def cacheResult' (e : Expr) (r : Result) : FunPropM Result := do
   modify (fun s => { s with cache := s.cache.insert e { expr := q(True), proof? := r.proof}})
   return r
+
+/-- Cache for failed goals such that `fun_prop` can fail fast next time. -/
+def cacheFailure' (e : Expr) : FunPropM Unit := do -- return proof?
+  modify (fun s => { s with failureCache := s.failureCache.insert e })
 
 mutual
   /-- Main `funProp` function. Returns proof of `e`. -/
@@ -605,4 +713,38 @@ mutual
     if f.isLet then
       return ← funProp (← mapLetTelescope f fun _ b => pure <| e.setArg funPropDecl.funArgId b)
     match ← getFunctionData? f (← unfoldNamePred) with
-      sorry
+    | .letE f =>
+      trace[Debug.Meta.Tactic.fun_prop] "let case on {← ppExpr f}"
+      let e := e.setArg funPropDecl.funArgId f -- update e with reduced f
+      letCase funPropDecl e f funProp
+    | .lam f =>
+      trace[Debug.Meta.Tactic.fun_prop] "pi caese on {← ppExpr f}"
+      let e := e.setArg funPropDecl.funArgId f -- update e with reduced f
+      applyPiRule funPropDecl e funProp
+    | .data fData =>
+      trace[Meta.Tactic.fun_prop] "Funprop normal form: {← ppExpr fData.fn}"
+      let e := e.setArg funPropDecl.funArgId (← fData.toExpr) -- update with reduced f
+      if fData.isIdentityFun then
+        applyIdRule funPropDecl e funProp
+      else if fData.isConstantFun then
+        applyConstRule funPropDecl e funProp
+      else
+        match fData.fn with
+        | .fvar id =>
+          if id == fData.mainVar.fvarId! then
+            bvarAppCase funPropDecl e fData funProp
+          else
+            fvarAppCase funPropDecl e fData funProp
+        | .const .. | .proj .. => do
+          constAppCase funPropDecl e fData funProp
+        | _ =>
+          trace[Debug.Meta.Tactic.fun_prop] "unknown case, ctor: {f.ctorName}\n{e}"
+          return none
+
+end
+
+
+
+
+
+end Core

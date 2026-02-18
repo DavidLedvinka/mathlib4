@@ -669,7 +669,6 @@ mutual
     -- if function starts with let bindings move them the top of `e` and try again
     if f.isLet then
       return ← funProp (← mapLetTelescope f fun _ b => pure <| e.setArg funPropDecl.funArgId b)
-
     match ← getFunctionData? f (← unfoldNamePred) with
     | .letE f =>
       trace[Debug.Meta.Tactic.fun_prop] "let case on {← ppExpr f}"
@@ -680,8 +679,14 @@ mutual
       let e := e.setArg funPropDecl.funArgId f -- update e with reduced f
       applyPiRule funPropDecl e funProp
     | .data fData =>
+      trace[Meta.Tactic.fun_prop] "Funprop normal form: {← ppExpr fData.fn}"
+      trace[Meta.Tactic.fun_prop] "Mainvar : {← ppExpr fData.mainVar}"
+      for arg in fData.args do
+        trace[Meta.Tactic.fun_prop] "args : {← ppExpr arg.expr}"
       let e := e.setArg funPropDecl.funArgId (← fData.toExpr) -- update e with reduced f
-
+      -- **DETECT SUBTYPES?**
+      if ← fData.isToSubtype then
+        trace[Meta.Tactic.fun_prop] "To Subtype Detected!"
       if fData.isIdentityFun then
         applyIdRule funPropDecl e funProp
       else if fData.isConstantFun then
