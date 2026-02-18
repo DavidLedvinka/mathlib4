@@ -240,8 +240,58 @@ example {α ι : Type*} [MeasurableSpace α] [Countable ι] {p : ι → α → P
 set_option trace.Meta.Tactic.fun_prop true
 --set_option pp.all true
 
-theorem add'' {f g : ℝ → ℝ} (hf : Measurable f) (hg : Measurable g) :
-    Measurable (fun x => f x + g x) := by fun_prop
+variable {G : Type*} [Group G] [MeasurableSpace G] {H K : Subgroup G}
 
-theorem add''' {f g : ℝ → ℝ} (hf : Measurable f) (hg : Measurable g) :
-    Measurable (f + g) := by fun_prop
+#check Pi.add_def
+#check Measurable.subtype_coe
+#check Measurable.mul
+
+HAdd.hAdd
+
+example {f g : ℝ → ℝ} (hf : Continuous f) (hg : Continuous g) :
+    Continuous (f + g) := by
+  unfold HAdd.hAdd instHAdd
+
+  -- eta_reduce
+  --simp only
+  -- unfold Add.add
+  -- unfold Pi.instAdd
+  --simp
+
+  fun_prop [HAdd.hAdd, Add.add, Real.add]
+
+#check Real.add
+
+@[to_additive]
+instance [MeasurableMul₂ G] : MeasurableMul₂ H where
+  measurable_mul := by
+    push fun _ ↦ _
+    apply Measurable.subtype_mk
+    fun_prop
+
+variable {α β : Type*} [MeasurableSpace α] {p : α → Prop} [MeasurableSpace β]
+
+example (f : β → α) (hf : ∀ x, p (f x)): Measurable (fun x ↦ (⟨f x, hf x⟩ : {x : α // p x})) := by
+  apply Measurable.subtype_mk
+
+  fun_prop
+
+open NNReal
+
+example {f : ℝ → ℝ≥0} (hf : Continuous (fun x ↦ (f x : ℝ))) : Continuous f := by
+  apply Continuous.subtype_mk
+  -- apply Continuous.comp
+  -- · sorry
+  -- · apply Continuous.subtype_mk
+
+  fun_prop
+  --exact hf
+
+
+-- theorem add'' {f g : ℝ → ℝ} (hf : Measurable f) (hg : Measurable g) :
+--     Measurable (fun x => f x + g x) := by fun_prop
+
+-- theorem add''' {f g : ℝ → ℝ} (hf : Measurable f) (hg : Measurable g) :
+--     Measurable (f + g) := by fun_prop
+
+-- #check Pi.mul_def
