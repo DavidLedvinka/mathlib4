@@ -931,6 +931,12 @@ lemma smul_iSup {R} [SMul R ℝ≥0∞] [IsScalarTower R ℝ≥0∞ ℝ≥0∞] 
     c • ⨆ i, f i = ⨆ i, c • f i := by
   simp only [← smul_one_mul c (f _), ← smul_one_mul c (iSup _), ENNReal.mul_iSup]
 
+lemma smul_iInf [Nonempty ι] {R} [SMul R ℝ≥0∞] [IsScalarTower R ℝ≥0∞ ℝ≥0∞]
+    (f : ι → ℝ≥0∞) {c : R} (hc : c • (1 : ℝ≥0∞) ≠ ∞) :
+    c • ⨅ i, f i = ⨅ i, c • f i := by
+  simp_rw [← smul_one_mul c (f _), ← smul_one_mul c (iInf _),
+    ENNReal.mul_iInf (fun h ↦ False.elim (hc h))]
+
 lemma smul_sSup {R} [SMul R ℝ≥0∞] [IsScalarTower R ℝ≥0∞ ℝ≥0∞] (s : Set ℝ≥0∞) (c : R) :
     c • sSup s = ⨆ a ∈ s, c • a := by
   simp_rw [← smul_one_mul c (sSup s), ENNReal.mul_sSup, smul_one_mul]
