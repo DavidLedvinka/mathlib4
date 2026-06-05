@@ -206,8 +206,19 @@ abbrev PseudoRandom := Monad.toMeasurableSpaceMonad Rand
 
 open MeasureTheory
 
+open MeasurableSpacePure MeasurableSpaceBind MeasurableSpaceFunctor MeasurableSpaceMonad
+
 noncomputable instance : MeasurableSpaceMonad Measure where
   mPure := Measure.dirac
   mBind := Measure.bind
+
+instance : LawfulMeasurableSpaceMonad Measure where
+  mMap_const := by simp [mMapConst, mMap]
+  id_mMap μ := by simp [mMap]
+  mPure_measurable := by unfold mPure; fun_prop
+  mBind_measurable := by unfold mBind; fun_prop
+  mBind_mPure_comp _ _ := by rfl
+  mPure_mBind x _ hf := Measure.dirac_bind hf x
+  mBind_assoc _ _ _ hf hg := Measure.bind_bind hf.aemeasurable hg.aemeasurable
 
 end Instances
