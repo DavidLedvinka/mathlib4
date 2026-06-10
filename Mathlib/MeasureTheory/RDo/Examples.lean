@@ -2,6 +2,7 @@ module
 
 public import Mathlib.MeasureTheory.RDo.RDo
 public import Mathlib.MeasureTheory.RDo.MeasurableSpaceInstances
+public import Mathlib.Algebra.Ring.BooleanRing
 
 set_option linter.style.header false
 
@@ -16,12 +17,12 @@ universe u v
 noncomputable def measureSample : Measure Bool := rdo
   let x ← bernoulliMeasure true false ⟨(1 : ℝ) / 2, by norm_num⟩
   let y ← bernoulliMeasure true false ⟨(1 : ℝ) / 2, by norm_num⟩
-  return x && y
+  return x + y
 
-noncomputable def pseudoSample : PseudoRandom Bool := rdo
+def pseudoSample : PseudoRandom Bool := rdo
   let x ← Random.randBool
   let y ← Random.randBool
-  return x && y
+  return x + y
 
 /- # Polymorphic examples -/
 
@@ -44,13 +45,6 @@ def indepAnd [HasBit m] : m Bool := rdo
 noncomputable def indepAndMeasure : Measure Bool := indepAnd (m := Measure)
 
 def indepAndGen : PseudoRandom Bool := indepAnd (m := PseudoRandom)
-
-def BitsArray : Array Bool := Id.run do
-  let mut xs : Array Bool := #[]
-  for _ in List.range 5 do
-    let b := true
-    xs := xs.push b
-  return xs
 
 variable {α : Type*} [MeasurableSpace α]
 

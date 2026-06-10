@@ -61,7 +61,7 @@ open MeasurableSpaceFunctor
 class LawfulMeasurableSpaceFunctor
     (f : (α : Type u) → [MeasurableSpace α] → Type v) [MeasurableSpaceFunctor f]
     [∀ α, [MeasurableSpace α] → MeasurableSpace (f α)] : Prop where
-  mMap_measurable {α β : Type u} [MeasurableSpace α] [MeasurableSpace β]
+  measurable_mMap {α β : Type u} [MeasurableSpace α] [MeasurableSpace β]
       {g : α → β} (hg : Measurable g) :
     Measurable (mMap (f := f) g)
   mMap_const {α β : Type u} [MeasurableSpace α] [MeasurableSpace β] :
@@ -75,7 +75,7 @@ class LawfulMeasurableSpaceFunctor
 
 open LawfulMeasurableSpaceFunctor
 
-attribute [fun_prop] mMap_measurable
+attribute [fun_prop] measurable_mMap
 attribute [simp] id_mMap
 
 variable {f : (α : Type u) → [MeasurableSpace α] → Type v} [MeasurableSpaceFunctor f]
@@ -89,7 +89,7 @@ variable {f : (α : Type u) → [MeasurableSpace α] → Type v} [MeasurableSpac
   (comp_mMap x hm hg).symm
 
 theorem mMap_measurable' {g : α → β} (hg : Measurable g) : Measurable (fun x : f α => g <$>ₘ x) :=
-  mMap_measurable hg
+  measurable_mMap hg
 
 @[simp] theorem mMap_unit {a : f PUnit} : (fun _ => PUnit.unit) <$>ₘ a = a := by
   simp
@@ -100,9 +100,9 @@ class LawfulMeasurableSpaceMonad
     (m : (α : Type u) → [MeasurableSpace α] → Type v) [MeasurableSpaceMonad m]
     [∀ α, [MeasurableSpace α] → MeasurableSpace (m α)] : Prop
     extends LawfulMeasurableSpaceFunctor m where
-  mPure_measurable {α : Type u} [MeasurableSpace α] :
+  measurable_mPure {α : Type u} [MeasurableSpace α] :
     Measurable (mPure : α → m α)
-  mBind_measurable {α β : Type u} [MeasurableSpace α] [MeasurableSpace β]
+  measurable_mBind {α β : Type u} [MeasurableSpace α] [MeasurableSpace β]
       {f : α → m β} (hf : Measurable f) :
     Measurable (fun x : m α => x >>=ₘ f)
   mBind_mPure_comp {α β : Type u} [MeasurableSpace α] [MeasurableSpace β]
@@ -114,18 +114,18 @@ class LawfulMeasurableSpaceMonad
   mBind_assoc {α β γ : Type u} [MeasurableSpace α] [MeasurableSpace β] [MeasurableSpace γ]
       (x : m α) {f : α → m β} {g : β → m γ} (hf : Measurable f) (hg : Measurable g) :
     x >>=ₘ f >>=ₘ g = x >>=ₘ fun x => f x >>=ₘ g
-  mMap_measurable hg := (by
-    convert mBind_measurable (mPure_measurable.comp hg)
+  measurable_mMap hg := (by
+    convert measurable_mBind (measurable_mPure.comp hg)
     exact (mBind_mPure_comp hg _).symm)
   comp_mMap x g_meas h_meas := (by
     rw [← mBind_mPure_comp (by fun_prop), ← mBind_mPure_comp h_meas,
       ← mBind_mPure_comp g_meas, mBind_assoc _ (by fun_prop) (by fun_prop)]
     congr with _
-    exact (mPure_mBind _ (mPure_measurable.comp h_meas)).symm)
+    exact (mPure_mBind _ (measurable_mPure.comp h_meas)).symm)
 
 open LawfulMeasurableSpaceMonad
 
-attribute [fun_prop] mPure_measurable mBind_measurable
+attribute [fun_prop] measurable_mPure measurable_mBind
 attribute [simp] pure_bind bind_assoc bind_pure_comp
 attribute [grind <=] pure_bind
 
@@ -215,8 +215,8 @@ noncomputable instance : MeasurableSpaceMonad Measure where
 instance : LawfulMeasurableSpaceMonad Measure where
   mMap_const := by simp [mMapConst, mMap]
   id_mMap μ := by simp [mMap]
-  mPure_measurable := by unfold mPure; fun_prop
-  mBind_measurable := by unfold mBind; fun_prop
+  measurable_mPure := by unfold mPure; fun_prop
+  measurable_mBind := by unfold mBind; fun_prop
   mBind_mPure_comp _ _ := by rfl
   mPure_mBind x _ hf := Measure.dirac_bind hf x
   mBind_assoc _ _ _ hf hg := Measure.bind_bind hf.aemeasurable hg.aemeasurable
