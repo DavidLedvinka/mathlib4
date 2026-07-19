@@ -152,10 +152,12 @@ public import Mathlib.Tactic.Hint
 public import Mathlib.Tactic.ITauto
 public import Mathlib.Tactic.InferParam
 public import Mathlib.Tactic.Inhabit
+public import Mathlib.Tactic.IntervalArithmetic.CacheTest
 public import Mathlib.Tactic.IntervalArithmetic.Certificate
 public import Mathlib.Tactic.IntervalArithmetic.Core
 public import Mathlib.Tactic.IntervalArithmetic.Dyadic
 public import Mathlib.Tactic.IntervalArithmetic.DyadicReal
+public import Mathlib.Tactic.IntervalArithmetic.DyadicReal'
 public import Mathlib.Tactic.IntervalArithmetic.Environment
 public import Mathlib.Tactic.IntervalArithmetic.ExactRatReal
 public import Mathlib.Tactic.IntervalArithmetic.Expr
@@ -219,6 +221,10 @@ public import Mathlib.Tactic.Linter.ValidatePRTitle
 public import Mathlib.Tactic.Linter.Whitespace
 public import Mathlib.Tactic.Measurability
 public import Mathlib.Tactic.Measurability.Init
+public import Mathlib.Tactic.MetaInterval.Certificate
+public import Mathlib.Tactic.MetaInterval.Core
+public import Mathlib.Tactic.MetaInterval.Expr
+public import Mathlib.Tactic.MetaInterval.Interval
 public import Mathlib.Tactic.MinImports
 public import Mathlib.Tactic.MkIffOfInductiveProp
 public import Mathlib.Tactic.ModCases
