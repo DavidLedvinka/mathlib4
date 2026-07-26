@@ -223,8 +223,11 @@ public import Mathlib.Tactic.Measurability
 public import Mathlib.Tactic.Measurability.Init
 public import Mathlib.Tactic.MetaInterval.Certificate
 public import Mathlib.Tactic.MetaInterval.Core
+public import Mathlib.Tactic.MetaInterval.Dyadic
 public import Mathlib.Tactic.MetaInterval.Expr
+public import Mathlib.Tactic.MetaInterval.Extensions
 public import Mathlib.Tactic.MetaInterval.Interval
+public import Mathlib.Tactic.MetaInterval.Tests
 public import Mathlib.Tactic.MinImports
 public import Mathlib.Tactic.MkIffOfInductiveProp
 public import Mathlib.Tactic.ModCases

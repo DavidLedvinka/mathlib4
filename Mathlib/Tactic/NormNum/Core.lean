@@ -108,6 +108,7 @@ def derive {α : Q(Type u)} (e : Q($α)) (post := false) : MetaM (Result e) := d
       if (bif post then ext.post else ext.pre) && ! normNums.erased.contains ext.name then
         try
           let new ← withReducibleAndInstances <| ext.eval e
+          recordExtraModUseFromDecl (isMeta := true) ext.name
           trace[Tactic.norm_num] "{ext.name}:\n{e} ==> {new}"
           return new
         catch err =>
@@ -200,8 +201,6 @@ initialize registerBuiltinAttribute {
             return e
         DiscrTree.mkPath e
       normNumExt.add ((keys, declName), ext) kind
-      -- TODO: track what `[norm_num]` decls are actually used at use sites
-      recordExtraRevUseOfCurrentModule
     | _ => throwUnsupportedSyntax
   erase := fun declName => do
     let s := normNumExt.getState (← getEnv)

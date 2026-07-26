@@ -4,7 +4,7 @@ public import Mathlib.Tactic.MetaInterval.Interval
 
 set_option linter.style.header false
 
-@[expose] public section
+@[expose] public meta section
 
 open Lean Meta
 
