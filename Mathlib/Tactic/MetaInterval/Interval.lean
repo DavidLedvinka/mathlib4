@@ -44,7 +44,6 @@ instance [Preorder α] [DecidableLE α] (i j : Interval α) : Decidable (i.le j)
   | ⟨_, some _⟩, ⟨⊥, _⟩ => isFalse id
   | ⟨_, some ub⟩, ⟨some lb, _⟩ => inferInstanceAs (Decidable (ub ≤ lb))
 
-/-- **Proof By Codex** -/
 lemma Interval.le_of_le [Preorder α] [Preorder β] {f : α → β} (hf : Monotone f) {x y : β}
     {i j : Interval α} (hxi : x ∈ (i.map f).toSet) (hyj : y ∈ (j.map f).toSet) (hij : i.le j) :
     x ≤ y := by

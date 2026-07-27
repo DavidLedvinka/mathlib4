@@ -287,124 +287,84 @@ theorem div_mem {r s : ℝ} {x y : Interval Dyadic}
 
 meta section
 
-meta def evalInterval (e : Expr) : MetaM (Interval Dyadic) := do
-  let type ← mkAppM ``Interval #[mkConst ``Dyadic]
-  unsafe evalExpr (Interval Dyadic) type e
-
-meta def findHyp (id : FVarId) (ivars : Array FVarId)
-    (hyps : Array IntervalCertificate) :
-    MetaM IntervalCertificate := do
-  for i in [:ivars.size] do
-    if ivars[i]! == id then
-      return hyps[i]!
-  throwError "no interval hypothesis found for {mkFVar id}"
-
-meta def setUnaryGenerator (gen : CertificateGenerator) (op inclusion : Name) :
-    CertificateGeneratorM Unit := do
-  set ({
-    fvarSet := gen.fvarSet
-    ivarSet := gen.ivarSet
-    certGen := fun fvars ivars hyps => do
-      let cert ← gen.certGen fvars ivars hyps
-      let intervalExpr ← mkAppM op #[cert.intervalExpr]
-      let interval ← evalInterval intervalExpr
-      let proof ← mkAppM inclusion #[cert.proof]
-      return ⟨interval, intervalExpr, proof⟩
-  } : CertificateGenerator)
-
-meta def setBinaryGenerator (left right : CertificateGenerator) (op inclusion : Name) :
-    CertificateGeneratorM Unit := do
-  set ({
-    fvarSet := left.fvarSet.union right.fvarSet
-    ivarSet := left.ivarSet.union right.ivarSet
-    certGen := fun fvars ivars hyps => do
-      let lcert ← left.certGen fvars ivars hyps
-      let rcert ← right.certGen fvars ivars hyps
-      let intervalExpr ← mkAppM op #[lcert.intervalExpr, rcert.intervalExpr]
-      let interval ← evalInterval intervalExpr
-      let proof ← mkAppM inclusion #[lcert.proof, rcert.proof]
-      return ⟨interval, intervalExpr, proof⟩
-  } : CertificateGenerator)
-
-meta def realUnaryArg (e : Expr) : MetaM Expr := do
+meta def realUnaryArg (e : Expr) : CertificateGeneratorM Expr := do
   let .app _ a ← whnfR e | failure
   unless ← isDefEq (← inferType a) (mkConst ``Real) do failure
   unless ← isDefEq (← inferType e) (mkConst ``Real) do failure
   return a
 
-meta def realBinaryArgs (e : Expr) : MetaM (Expr × Expr) := do
+meta def realBinaryArgs (e : Expr) : CertificateGeneratorM (Expr × Expr) := do
   let .app (.app _ a) b ← whnfR e | failure
   unless ← isDefEq (← inferType a) (mkConst ``Real) do failure
   unless ← isDefEq (← inferType b) (mkConst ``Real) do failure
   unless ← isDefEq (← inferType e) (mkConst ``Real) do failure
   return (a, b)
 
-@[interval _]
-meta def evalFVar : IntervalExt where
-  eval e := do
-    let some id := e.fvarId? | failure
-    unless ← isDefEq (← inferType e) (mkConst ``Real) do failure
-    let ids := (default : FVarIdSet).insert id
-    set ({
-      fvarSet := ids
-      ivarSet := ids
-      certGen := fun _ ivars hyps => findHyp id ivars hyps
-    } : CertificateGenerator)
+meta def mapPureUnary (body : CertificateBody) (op inclusion : Name) :
+    CertificateGeneratorM CertificateBody := do
+  let .pureBody body := body
+    | throwError "Pure unary interval extension received a meta certificate"
+  let intervalExprBody ← mkAppM op #[body.intervalExprBody]
+  let intervalCompBody ← mkAppM op #[body.intervalCompBody]
+  let intervalProofBody ← mkAppM inclusion #[body.intervalProofBody]
+  return .pureBody ⟨intervalExprBody, intervalCompBody, intervalProofBody⟩
 
-@[interval OfNat.ofNat _]
+meta def mapPureBinary (left right : CertificateBody) (op inclusion : Name) :
+    CertificateGeneratorM CertificateBody := do
+  let .pureBody left := left
+    | throwError "Pure binary interval extension received a meta left certificate"
+  let .pureBody right := right
+    | throwError "Pure binary interval extension received a meta right certificate"
+  let intervalExprBody ← mkAppM op #[left.intervalExprBody, right.intervalExprBody]
+  let intervalCompBody ← mkAppM op #[left.intervalCompBody, right.intervalCompBody]
+  let intervalProofBody ←
+    mkAppM inclusion #[left.intervalProofBody, right.intervalProofBody]
+  return .pureBody ⟨intervalExprBody, intervalCompBody, intervalProofBody⟩
+
+meta def evalPureUnary (e : Expr) (op inclusion : Name) :
+    CertificateGeneratorM CertificateBody := do
+  let a ← realUnaryArg e
+  mapPureUnary (← mkCertificateBody a) op inclusion
+
+meta def evalPureBinary (e : Expr) (op inclusion : Name) :
+    CertificateGeneratorM CertificateBody := do
+  let (a, b) ← realBinaryArgs e
+  let left ← mkCertificateBody a
+  let right ← mkCertificateBody b
+  mapPureBinary left right op inclusion
+
+@[intervalExt OfNat.ofNat _]
 meta def evalOfNat : IntervalExt where
   eval e := do
     let (``OfNat.ofNat, #[α, n, _]) := e.getAppFnArgs | failure
     unless ← isDefEq α (mkConst ``Real) do failure
     guard n.isRawNatLit
-    set ({
-      fvarSet := default
-      ivarSet := default
-      certGen := fun _ _ _ => do
-        let intervalExpr ← mkAppM ``ofNat #[n]
-        let interval ← evalInterval intervalExpr
-        let proof ← mkAppM ``ofNat_mem #[n]
-        return ⟨interval, intervalExpr, proof⟩
-    } : CertificateGenerator)
+    let intervalBody ← mkAppM ``ofNat #[n]
+    let proofBody ← mkAppM ``ofNat_mem #[n]
+    return .pureBody ⟨intervalBody, intervalBody, proofBody⟩
 
-@[interval Neg.neg _]
+@[intervalExt Neg.neg _]
 meta def evalNeg : IntervalExt where
-  eval e := do
-    let a ← realUnaryArg e
-    setUnaryGenerator (← toCertificateGenerator a) ``neg ``neg_mem
+  eval e := evalPureUnary e ``neg ``neg_mem
 
-@[interval _ + _]
+@[intervalExt _ + _]
 meta def evalAdd : IntervalExt where
-  eval e := do
-    let (a, b) ← realBinaryArgs e
-    setBinaryGenerator (← toCertificateGenerator a) (← toCertificateGenerator b) ``add ``add_mem
+  eval e := evalPureBinary e ``add ``add_mem
 
-@[interval _ - _]
+@[intervalExt _ - _]
 meta def evalSub : IntervalExt where
-  eval e := do
-    let (a, b) ← realBinaryArgs e
-    setBinaryGenerator (← toCertificateGenerator a) (← toCertificateGenerator b) ``sub ``sub_mem
+  eval e := evalPureBinary e ``sub ``sub_mem
 
-@[interval _ * _]
+@[intervalExt _ * _]
 meta def evalMul : IntervalExt where
-  eval e := do
-    let (a, b) ← realBinaryArgs e
-    setBinaryGenerator (← toCertificateGenerator a) (← toCertificateGenerator b) ``mul ``mul_mem
+  eval e := evalPureBinary e ``mul ``mul_mem
 
-@[interval _ / _]
+@[intervalExt _ / _]
 meta def evalDiv : IntervalExt where
-  eval e := do
-    let (a, b) ← realBinaryArgs e
-    setBinaryGenerator (← toCertificateGenerator a) (← toCertificateGenerator b) ``div ``div_mem
+  eval e := evalPureBinary e ``div ``div_mem
 
 end
 
 end MetaInterval
-
-meta section
-
-elab "meta_interval" : tactic => IntervalArithmetic.intervalTactic
-
-end
 
 end IntervalArithmetic

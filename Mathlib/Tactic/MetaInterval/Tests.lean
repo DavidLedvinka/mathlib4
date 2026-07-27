@@ -7,6 +7,7 @@ set_option linter.style.header false
 
 @[expose] public section
 
+open Lean Meta
 open IntervalArithmetic
 
 namespace IntervalArithmetic.MetaInterval.Tests
@@ -27,6 +28,9 @@ example : (1 : ℝ) / 3 ≤ 334 / 1000 := by
 
 example {x y : ℝ} (hx : x ∈ (unitInterval.map Dyadic.toReal).toSet)
     (hy : y ∈ (positiveInterval.map Dyadic.toReal).toSet) : x + y ≤ 6 := by
+  meta_interval
+
+example {x : ℝ} (hx : x ∈ (unitInterval.map Dyadic.toReal).toSet) : x + x ≤ 4 := by
   meta_interval
 
 example {x y : ℝ} (hx : x ∈ (unitInterval.map Dyadic.toReal).toSet)
@@ -57,11 +61,31 @@ example {x y : ℝ} (hx : x ∈ (unitInterval.map Dyadic.toReal).toSet)
 example {x : ℝ} (hx : x ∈ (unitInterval.map Dyadic.toReal).toSet) : -x ≤ -1 := by
   meta_interval
 
+example {x : ℝ} (hx : x ^ 2 ∈ (unitInterval.map Dyadic.toReal).toSet) : x ^ 2 + 1 ≤ 3 := by
+  meta_interval
+
+example (_x : ℝ) : True := by
+  fail_if_success
+    have : _x ≤ 1 := by
+      meta_interval
+  trivial
+
 example {x y : ℝ} (_hx : x ∈ (unitInterval.map Dyadic.toReal).toSet)
     (_hy : y ∈ (zeroInterval.map Dyadic.toReal).toSet) : True := by
   fail_if_success
     have : x / y ≤ 10 := by
       meta_interval
   trivial
+
+run_meta
+  withLocalDeclD `x (mkConst ``Real) fun x => do
+    let e ← mkAppM ``HAdd.hAdd #[x, x]
+    let gen ← toCertificateGenerator e
+    unless gen.iVarExprs.size == 1 do
+      throwError "Expected repeated expressions to share one interval variable"
+    match gen.fn with
+    | .pureCert _ => pure ()
+    | .metaCert _ =>
+      throwError "Expected a composition of pure extensions to remain pure"
 
 end IntervalArithmetic.MetaInterval.Tests
