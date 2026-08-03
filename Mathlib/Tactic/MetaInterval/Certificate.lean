@@ -22,6 +22,12 @@ structure IntervalCertificate where
   proof : Expr
   deriving Inhabited
 
+structure IntervalM.State where
+  cache : ExprMap (IntervalCertificate × Interval Dyadic) := {}
+  deriving Inhabited
+
+abbrev IntervalM := StateT IntervalM.State MetaM
+
 abbrev IntervalComp := Array ℕ → Array (Interval Dyadic) → Interval Dyadic
 
 structure PureCertificateFunction where
@@ -41,8 +47,9 @@ structure PureCertificateFunction where
   deriving Inhabited
 
 abbrev MetaCertificateFunction :=
-  Array Expr → Array Expr → Array Expr → Array Expr → Array (Interval Dyadic) →
-    MetaM (IntervalCertificate × Interval Dyadic)
+  Array Expr → Array Expr → Array Expr → Array Expr →
+    Array ℕ → Array (Interval Dyadic) →
+    IntervalM (IntervalCertificate × Interval Dyadic)
 
 inductive CertificateFunction
   | pureCert : PureCertificateFunction → CertificateFunction
@@ -72,6 +79,8 @@ inductive CertificateBody where
 
 structure CertificateGeneratorM.Context where
   params : Array FVarId
+  localContext : LocalContext
+  localInstances : LocalInstances
   deriving Inhabited
 
 structure IVarData where
@@ -90,15 +99,29 @@ abbrev CertificateGeneratorM :=
   ReaderT CertificateGeneratorM.Context <| StateT CertificateGeneratorM.State MetaM
 
 def CertificateGeneratorM.run {α : Type} (x : CertificateGeneratorM α)
-    (params : Array FVarId := #[]) : MetaM α :=
-  StateT.run' (ReaderT.run x { params }) default
+    (params : Array FVarId := #[]) : MetaM α := do
+  let localContext ← getLCtx
+  let localInstances ← getLocalInstances
+  StateT.run' (ReaderT.run x { params, localContext, localInstances }) default
 
 def mkIVar (e : Expr) : CertificateGeneratorM IVarData := do
-  let exprVar ← mkFreshExprSyntheticOpaqueMVar (← inferType e)
-  let intervalExprVar ← mkFreshExprSyntheticOpaqueMVar q(Interval Dyadic)
-  let intervalVar ← mkFreshExprSyntheticOpaqueMVar q(Interval Dyadic)
+  let ctx ← read
+  unless ← MetavarContext.isWellFormed ctx.localContext e do
+    throwError "Cannot create an interval variable for {e} because it depends on variables \
+      introduced while constructing the certificate"
+  let eType ← inferType e
+  unless ← MetavarContext.isWellFormed ctx.localContext eType do
+    throwError "Cannot create an interval variable for {e} because its type depends on variables \
+      introduced while constructing the certificate"
+  let exprVar ←
+    mkFreshExprMVarAt ctx.localContext ctx.localInstances eType .syntheticOpaque
+  let intervalExprVar ←
+    mkFreshExprMVarAt ctx.localContext ctx.localInstances q(Interval Dyadic) .syntheticOpaque
+  let intervalVar ←
+    mkFreshExprMVarAt ctx.localContext ctx.localInstances q(Interval Dyadic) .syntheticOpaque
   let hypType ← mkIntervalMem exprVar intervalExprVar (mkConst ``Dyadic.toReal)
-  let hypVar ← mkFreshExprSyntheticOpaqueMVar hypType
+  let hypVar ←
+    mkFreshExprMVarAt ctx.localContext ctx.localInstances hypType .syntheticOpaque
   let data := ⟨exprVar, intervalExprVar, intervalVar, hypVar⟩
   modify fun state => { state with ivars := state.ivars.insert e data }
   return data
@@ -119,29 +142,30 @@ def compileIntervalComp (params intervals : Array Expr) (body : PureCertificateB
       let intervalComp ← mkLambdaFVars #[params', intervals'] intervalCompBody
       unsafe evalExpr IntervalComp q(IntervalComp) intervalComp
 
-def compileMetaCertificateFn (params iVarIds intervalExprs hyps intervals : Array Expr)
+def compileMetaCertificateFn (paramExprs iVarIds intervalExprs hyps intervals : Array Expr)
     (body : MetaCertificateBody) : MetaM MetaCertificateFunction := do
-  withLocalDeclD `params q(Array Expr) fun params' => do
+  withLocalDeclD `paramExprs q(Array Expr) fun paramExprs' => do
     withLocalDeclD `iVarIds q(Array Expr) fun iVarIds' => do
       withLocalDeclD `intervalExprs q(Array Expr) fun intervalExprs' => do
         withLocalDeclD `hyps q(Array Expr) fun hyps' => do
-          withLocalDeclD `intervals q(Array (Interval Dyadic)) fun intervals' => do
-            let getParams ← params.mapIdxM fun i _ => do
-              mkAppM ``getElem! #[params', mkNatLit i]
-            let getIVarIds ← iVarIds.mapIdxM fun i _ => do
-              mkAppM ``getElem! #[iVarIds', mkNatLit i]
-            let getIntervalExprs ← intervalExprs.mapIdxM fun i _ => do
-              mkAppM ``getElem! #[intervalExprs', mkNatLit i]
-            let getHyps ← hyps.mapIdxM fun i _ => do
-              mkAppM ``getElem! #[hyps', mkNatLit i]
-            let getIntervals ← intervals.mapIdxM fun i _ => do
-              mkAppM ``getElem! #[intervals', mkNatLit i]
-            let fnBody ← body.body.replaceFVarsM
-              (params ++ iVarIds ++ intervalExprs ++ hyps ++ intervals)
-              (getParams ++ getIVarIds ++ getIntervalExprs ++ getHyps ++ getIntervals)
-            let fn ←
-              mkLambdaFVars #[params', iVarIds', intervalExprs', hyps', intervals'] fnBody
-            unsafe evalExpr MetaCertificateFunction q(MetaCertificateFunction) fn
+          withLocalDeclD `params q(Array ℕ) fun params' => do
+            withLocalDeclD `intervals q(Array (Interval Dyadic)) fun intervals' => do
+              let getParamExprs ← paramExprs.mapIdxM fun i _ => do
+                mkAppM ``getElem! #[paramExprs', mkNatLit i]
+              let getIVarIds ← iVarIds.mapIdxM fun i _ => do
+                mkAppM ``getElem! #[iVarIds', mkNatLit i]
+              let getIntervalExprs ← intervalExprs.mapIdxM fun i _ => do
+                mkAppM ``getElem! #[intervalExprs', mkNatLit i]
+              let getHyps ← hyps.mapIdxM fun i _ => do
+                mkAppM ``getElem! #[hyps', mkNatLit i]
+              let getIntervals ← intervals.mapIdxM fun i _ => do
+                mkAppM ``getElem! #[intervals', mkNatLit i]
+              let fnBody ← body.body.replaceFVarsM
+                (paramExprs ++ iVarIds ++ intervalExprs ++ hyps ++ intervals)
+                (getParamExprs ++ getIVarIds ++ getIntervalExprs ++ getHyps ++ getIntervals)
+              let fn ← mkLambdaFVars
+                #[paramExprs', iVarIds', intervalExprs', hyps', params', intervals'] fnBody
+              unsafe evalExpr MetaCertificateFunction q(MetaCertificateFunction) fn
 
 def mkCertificateGenerator (body : CertificateBody) :
     CertificateGeneratorM CertificateGenerator := do
@@ -278,7 +302,8 @@ def mkCertificateBody (e : Expr) : CertificateGeneratorM CertificateBody := do
     let data ← mkIVar e
     trace[Tactic.interval] "No extension applied to {e}; created an ivar"
     return data.toCertificateBody
-  throwError "{e} is not a real expression and no interval extensions apply"
+  throwError "{e} is not a real expression or depends on bound variables and no interval
+    extensions apply"
 
 def toCertificateGenerator (e : Expr) (params : Array FVarId := #[]) :
     MetaM CertificateGenerator :=

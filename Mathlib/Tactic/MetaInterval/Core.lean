@@ -14,12 +14,6 @@ open Lean Meta Elab Tactic Qq
 
 namespace IntervalArithmetic
 
-structure IntervalM.State where
-  cache : ExprMap (IntervalCertificate × Interval Dyadic) := {}
-  deriving Inhabited
-
-abbrev IntervalM := StateT IntervalM.State MetaM
-
 /-- Temporarily we only extract the first appearance of `x ∈ (i.map Dyadic.toReal).toSet`. -/
 def mkIntervalHyp (x : Expr) : IntervalM Unit := do
   if (← get).cache.contains x then
@@ -39,21 +33,22 @@ def CertificateGenerator.toIntervalCertificate (gen : CertificateGenerator) (e :
   for i in gen.iVarExprs do
     mkIntervalHyp i
   let cache := (← get).cache
-  let certs := gen.iVarExprs.map fun i => (cache.get! i).1
-  let intervals := gen.iVarExprs.map fun i => (cache.get! i).2
+  let certs := gen.iVarExprs.map fun i => (cache[i]!).1
+  let intervals := gen.iVarExprs.map fun i => (cache[i]!).2
+  let params ← gen.params.mapM fun param => do
+    let some value ← getNatValue? param
+      | throwError "Interval parameter {param} is not a natural-number literal"
+    return value
   match gen.fn with
   | .pureCert fn => do
-    let params ← gen.params.mapM fun param => do
-      let some value ← liftM <| getNatValue? param
-        | throwError "Interval parameter {param} is not a natural-number literal"
-      return value
     let intervalExpr := mkAppN fn.intervalExpr (gen.params ++ certs.map (·.intervalExpr))
     let interval := fn.intervalComp params intervals
     let proof := mkAppN fn.proof
       (gen.params ++ gen.iVarExprs ++ certs.map (·.intervalExpr) ++ certs.map (·.proof))
     return (⟨e, intervalExpr, proof⟩, interval)
   | .metaCert fn =>
-    fn gen.params gen.iVarExprs (certs.map (·.intervalExpr)) (certs.map (·.proof)) intervals
+    fn gen.params gen.iVarExprs (certs.map (·.intervalExpr)) (certs.map (·.proof))
+      params intervals
 
 /-- Temporarily we only handle `le` goals on `ℝ` with a `Dyadic` backend. -/
 def intervalCore (g : MVarId) : IntervalM Expr := do

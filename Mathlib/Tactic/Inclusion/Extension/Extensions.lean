@@ -1,9 +1,8 @@
 module
 
-public import Mathlib.Tactic.MetaInterval.Interval
-public meta import Mathlib.Tactic.MetaInterval.Certificate
-public import Mathlib.Tactic.MetaInterval.Dyadic
-public meta import Mathlib.Tactic.MetaInterval.Core
+public import Mathlib.Tactic.Inclusion.Extension.Interval
+public import Mathlib.Tactic.Inclusion.Extension.Dyadic
+public meta import Mathlib.Tactic.Inclusion.Core.Core
 public import Mathlib.Algebra.Order.Field.Basic
 public import Mathlib.Algebra.BigOperators.Group.Finset.Basic
 public import Mathlib.MeasureTheory.Integral.IntervalIntegral.Basic
@@ -13,13 +12,13 @@ set_option linter.style.header false
 
 @[expose] public section
 
-open Lean Meta Elab Tactic Qq
+open Lean Meta
 open Set MeasureTheory
 
-namespace IntervalArithmetic
-namespace MetaInterval
+namespace IntervalArithmetic.Inclusion
 
-/-! ### Arithmetic on intervals -/
+instance instToSetIntervalDyadicReal : ToSet (Interval Dyadic) ℝ where
+  toSet I := (I.map Dyadic.toReal).toSet
 
 def ofNat (n : ℕ) : Interval Dyadic := Interval.singleton Dyadic n
 
@@ -51,7 +50,6 @@ def min4 (a b c d : Dyadic) : Dyadic := min (min a b) (min c d)
 
 def max4 (a b c d : Dyadic) : Dyadic := max (max a b) (max c d)
 
-/-- Multiplication is precise for bounded intervals and conservatively returns `univ` otherwise. -/
 def mul (x y : Interval Dyadic) : Interval Dyadic :=
   match x, y with
   | ⟨some xl, some xu⟩, ⟨some yl, some yu⟩ =>
@@ -59,7 +57,6 @@ def mul (x y : Interval Dyadic) : Interval Dyadic :=
         some (max4 (xl * yl) (xl * yu) (xu * yl) (xu * yu))⟩
   | _, _ => Interval.univ Dyadic
 
-/-- The number of binary digits used when a reciprocal is not exactly dyadic. -/
 def divisionPrecision : Int := 20
 
 def lowerApprox (q : ℚ) : Dyadic := q.toDyadic divisionPrecision
@@ -79,7 +76,13 @@ def inv (x : Interval Dyadic) : Interval Dyadic :=
 
 def div (x y : Interval Dyadic) : Interval Dyadic := mul x (inv y)
 
-/-! ### Correctness lemmas -/
+def le (x y : Interval Dyadic) : IntervalBool :=
+  match x.ub, y.lb with
+  | some xu, some yl => if xu ≤ yl then .true else .undetermined
+  | _, _ => .undetermined
+
+theorem mem_univ (r : ℝ) : r ∈ Interval.univ Dyadic := by
+  constructor <;> simp [Interval.univ, Interval.map]
 
 @[simp]
 lemma toReal_add (a b : Dyadic) :
@@ -155,8 +158,7 @@ lemma mul_le_max4 {a b c d x y : ℝ} (hx : a ≤ x ∧ x ≤ b) (hy : c ≤ y �
     · exact (mul_le_mul_of_nonpos_right hx.1 hy).trans (le_max_left _ _)).trans
   exact max_le_max ha hb
 
-theorem ofNat_mem (n : ℕ) :
-    (OfNat.ofNat n : ℝ) ∈ ((ofNat n).map Dyadic.toReal).toSet := by
+theorem ofNat_mem (n : ℕ) : (OfNat.ofNat n : ℝ) ∈ ofNat n := by
   constructor
   · exact WithBot.coe_le_coe.mpr <| by
       simp [Dyadic.toReal, Dyadic.toRat_natCast, Semiring.toGrindSemiring_ofNat ℝ n]
@@ -164,8 +166,7 @@ theorem ofNat_mem (n : ℕ) :
       simp [Dyadic.toReal, Dyadic.toRat_natCast, Semiring.toGrindSemiring_ofNat ℝ n]
 
 theorem add_mem {r s : ℝ} {x y : Interval Dyadic}
-    (hrx : r ∈ (x.map Dyadic.toReal).toSet) (hsy : s ∈ (y.map Dyadic.toReal).toSet) :
-    r + s ∈ ((add x y).map Dyadic.toReal).toSet := by
+    (hrx : r ∈ x) (hsy : s ∈ y) : r + s ∈ add x y := by
   match x, y with
   | ⟨xl, xu⟩, ⟨yl, yu⟩ =>
     constructor
@@ -182,8 +183,7 @@ theorem add_mem {r s : ℝ} {x y : Interval Dyadic}
           rw [toReal_add]
           exact add_le_add (WithTop.coe_le_coe.mp hrx.2) (WithTop.coe_le_coe.mp hsy.2)
 
-theorem neg_mem {r : ℝ} {x : Interval Dyadic} (hrx : r ∈ (x.map Dyadic.toReal).toSet) :
-    -r ∈ ((neg x).map Dyadic.toReal).toSet := by
+theorem neg_mem {r : ℝ} {x : Interval Dyadic} (hrx : r ∈ x) : -r ∈ neg x := by
   match x with
   | ⟨xl, xu⟩ =>
     constructor
@@ -201,8 +201,7 @@ theorem neg_mem {r : ℝ} {x : Interval Dyadic} (hrx : r ∈ (x.map Dyadic.toRea
           exact neg_le_neg (WithBot.coe_le_coe.mp hrx.1)
 
 theorem sub_mem {r s : ℝ} {x y : Interval Dyadic}
-    (hrx : r ∈ (x.map Dyadic.toReal).toSet) (hsy : s ∈ (y.map Dyadic.toReal).toSet) :
-    r - s ∈ ((sub x y).map Dyadic.toReal).toSet := by
+    (hrx : r ∈ x) (hsy : s ∈ y) : r - s ∈ sub x y := by
   match x, y with
   | ⟨xl, xu⟩, ⟨yl, yu⟩ =>
     constructor
@@ -220,8 +219,7 @@ theorem sub_mem {r s : ℝ} {x y : Interval Dyadic}
           exact sub_le_sub (WithTop.coe_le_coe.mp hrx.2) (WithBot.coe_le_coe.mp hsy.1)
 
 theorem mul_mem {r s : ℝ} {x y : Interval Dyadic}
-    (hrx : r ∈ (x.map Dyadic.toReal).toSet) (hsy : s ∈ (y.map Dyadic.toReal).toSet) :
-    r * s ∈ ((mul x y).map Dyadic.toReal).toSet := by
+    (hrx : r ∈ x) (hsy : s ∈ y) : r * s ∈ mul x y := by
   match x, y with
   | ⟨some xl, some xu⟩, ⟨some yl, some yu⟩ =>
     have hx : Dyadic.toReal xl ≤ r ∧ r ≤ Dyadic.toReal xu :=
@@ -233,8 +231,9 @@ theorem mul_mem {r s : ℝ} {x y : Interval Dyadic}
         simpa [min4] using min4_mul_le hx hy
     · exact WithTop.coe_le_coe.mpr <| by
         simpa [max4] using mul_le_max4 hx hy
-  | ⟨⊥, _⟩, _ | ⟨some _, ⊤⟩, _ | _, ⟨⊥, _⟩ | _, ⟨some _, ⊤⟩ =>
-    simp [mul, Interval.univ, Interval.map, Interval.toSet]
+  | ⟨⊥, _⟩, _ | ⟨some _, ⊤⟩, _ | ⟨some _, some _⟩, ⟨⊥, _⟩
+    | ⟨some _, some _⟩, ⟨some _, ⊤⟩ =>
+    exact mem_univ _
 
 lemma lowerApprox_le (q : ℚ) : Dyadic.toReal (lowerApprox q) ≤ (q : ℝ) := by
   exact Rat.cast_le.mpr Rat.toRat_toDyadic_le
@@ -249,14 +248,13 @@ lemma le_upperApprox (q : ℚ) : (q : ℝ) ≤ Dyadic.toReal (upperApprox q) := 
       (by simpa [lowerApprox] using
         (Rat.lt_toRat_toDyadic_add (x := q) (prec := divisionPrecision)).le)
 
-theorem inv_mem {r : ℝ} {x : Interval Dyadic} (hrx : r ∈ (x.map Dyadic.toReal).toSet) :
-    1 / r ∈ ((inv x).map Dyadic.toReal).toSet := by
+theorem inv_mem {r : ℝ} {x : Interval Dyadic} (hrx : r ∈ x) : 1 / r ∈ inv x := by
   match x with
   | ⟨some xl, some xu⟩ =>
     by_cases hsign : 0 < xl ∨ xu < 0
     · have hxlr : Dyadic.toReal xl ≤ r := WithBot.coe_le_coe.mp hrx.1
       have hrxu : r ≤ Dyadic.toReal xu := WithTop.coe_le_coe.mp hrx.2
-      simp only [inv, hsign, if_pos, Interval.map]
+      simp only [inv, hsign, if_pos]
       constructor
       · apply WithBot.coe_le_coe.mpr
         apply (lowerApprox_le (1 / xu.toRat)).trans
@@ -278,37 +276,44 @@ theorem inv_mem {r : ℝ} {x : Interval Dyadic} (hrx : r ∈ (x.map Dyadic.toRea
         · have hxu' : Dyadic.toReal xu < 0 := by
             simpa using toReal_lt_toReal.mpr hxu
           exact one_div_le_one_div_of_neg_of_le (hrxu.trans_lt hxu') hxlr
-    · simp [inv, hsign, Interval.univ, Interval.map, Interval.toSet]
-  | ⟨⊥, _⟩ | ⟨some _, ⊤⟩ => simp [inv, Interval.univ, Interval.map, Interval.toSet]
+    · simpa [inv, hsign] using mem_univ (1 / r)
+  | ⟨⊥, _⟩ | ⟨some _, ⊤⟩ => simpa [inv] using mem_univ (1 / r)
 
 theorem div_mem {r s : ℝ} {x y : Interval Dyadic}
-    (hrx : r ∈ (x.map Dyadic.toReal).toSet) (hsy : s ∈ (y.map Dyadic.toReal).toSet) :
-    r / s ∈ ((div x y).map Dyadic.toReal).toSet := by
+    (hrx : r ∈ x) (hsy : s ∈ y) : r / s ∈ div x y := by
   rw [div_eq_mul_one_div]
   exact mul_mem hrx (inv_mem hsy)
 
-/-! ### Finite sums -/
+theorem mem_intervalBool_true {p : Prop} (hp : p) : p ∈ IntervalBool.true := by
+  simpa [ToSet.toSet, IntervalBool.toPropSet] using hp
+
+theorem mem_intervalBool_undetermined (p : Prop) : p ∈ IntervalBool.undetermined := by
+  classical
+  by_cases hp : p <;> simp [ToSet.toSet, IntervalBool.toPropSet, hp]
+
+theorem le_mem {r s : ℝ} {x y : Interval Dyadic}
+    (hrx : r ∈ x) (hsy : s ∈ y) : (r ≤ s) ∈ le x y := by
+  match x, y with
+  | ⟨_, some xu⟩, ⟨some yl, _⟩ =>
+    simp only [le]
+    split_ifs with h
+    · apply mem_intervalBool_true
+      exact (WithTop.coe_le_coe.mp hrx.2).trans
+        ((Monotone.dyadicToReal h).trans (WithBot.coe_le_coe.mp hsy.1))
+    · exact mem_intervalBool_undetermined _
+  | ⟨_, ⊤⟩, _ | ⟨_, some _⟩, ⟨⊥, _⟩ => exact mem_intervalBool_undetermined _
 
 def sumRangeIntervals : ℕ → (ℕ → Interval Dyadic) → Interval Dyadic
   | 0, _ => ofNat 0
   | n + 1, f => add (sumRangeIntervals n f) (f n)
 
 theorem sumRangeIntervals_mem (n : ℕ) {f : ℕ → ℝ} {I : ℕ → Interval Dyadic}
-    (h : ∀ i, f i ∈ ((I i).map Dyadic.toReal).toSet) :
-    Finset.sum (Finset.range n) f ∈
-      ((sumRangeIntervals n I).map Dyadic.toReal).toSet := by
+    (h : ∀ i, f i ∈ I i) : Finset.sum (Finset.range n) f ∈ sumRangeIntervals n I := by
   induction n with
-  | zero =>
-      simpa [sumRangeIntervals] using ofNat_mem 0
+  | zero => simpa [sumRangeIntervals] using ofNat_mem 0
   | succ n ih =>
-      rw [Finset.sum_range_succ]
-      exact add_mem ih (h n)
-
-/-! ### Integration over the unit interval
-
-This initial extension uses four equal pieces. The fixed subdivision is deliberately isolated in
-these definitions so that a tactic parameter can replace it once parameter plumbing is added.
--/
+    rw [Finset.sum_range_succ]
+    exact add_mem ih (h n)
 
 def unitIntegralStep : Dyadic := Dyadic.ofIntWithPrec 1 2
 
@@ -333,10 +338,8 @@ theorem unitIntegralStep_toReal : Dyadic.toReal unitIntegralStep = (1 : ℝ) / 4
 
 theorem integralPiece_mem {a b : ℝ} {f : ℝ → ℝ} {w : Dyadic} {I : Interval Dyadic}
     (hab : a ≤ b) (hw : b - a = Dyadic.toReal w)
-    (hf : IntervalIntegrable f volume a b)
-    (h : ∀ x ∈ Icc a b, f x ∈ (I.map Dyadic.toReal).toSet) :
-    (∫ x in a..b, f x) ∈
-      ((mul (Interval.singleton Dyadic w) I).map Dyadic.toReal).toSet := by
+    (hf : IntervalIntegrable f volume a b) (h : ∀ x ∈ Icc a b, f x ∈ I) :
+    (∫ x in a..b, f x) ∈ mul (Interval.singleton Dyadic w) I := by
   match I with
   | ⟨some l, some u⟩ =>
     have hl : ∫ _ in a..b, Dyadic.toReal l ≤ ∫ x in a..b, f x := by
@@ -360,18 +363,16 @@ theorem integralPiece_mem {a b : ℝ} {f : ℝ → ℝ} {w : Dyadic} {I : Interv
         hu.trans (le_max_right (Dyadic.toReal w * Dyadic.toReal l)
           (Dyadic.toReal w * Dyadic.toReal u))
   | ⟨⊥, _⟩ | ⟨some _, ⊤⟩ =>
-    simp [mul, Interval.univ, Interval.map, Interval.toSet]
+    exact mem_univ _
 
 theorem unitIntegral_mem {f : ℝ → ℝ}
     (g : Interval Dyadic → Interval Dyadic) (hf : Continuous f)
-    (h : ∀ (x : ℝ) (I : Interval Dyadic), x ∈ (I.map Dyadic.toReal).toSet →
-      f x ∈ ((g I).map Dyadic.toReal).toSet) :
-    (∫ x in (0 : ℝ)..1, f x) ∈ ((unitIntegralBound g).map Dyadic.toReal).toSet := by
+    (h : ∀ (x : ℝ) (I : Interval Dyadic), x ∈ I → f x ∈ g I) :
+    (∫ x in (0 : ℝ)..1, f x) ∈ unitIntegralBound g := by
   have hpiece (i : ℕ) :
       (∫ x in Dyadic.toReal (unitIntegralPoint i)..
         Dyadic.toReal (unitIntegralPoint (i + 1)), f x) ∈
-        ((mul (Interval.singleton Dyadic unitIntegralStep)
-          (g (unitIntegralPiece i))).map Dyadic.toReal).toSet := by
+        mul (Interval.singleton Dyadic unitIntegralStep) (g (unitIntegralPiece i)) := by
     apply integralPiece_mem
     · simp only [unitIntegralPoint_toReal, Nat.cast_add, Nat.cast_one]
       linarith
@@ -395,14 +396,7 @@ theorem unitIntegral_mem {f : ℝ → ℝ}
   rw [← hpartition']
   simpa [unitIntegralBound] using hsum
 
-/-! ### Extension implementations -/
-
-meta section
-
-/-- Ask `fun_prop` for continuity after temporarily presenting the synthetic ambient interval
-variables as ordinary local constants. -/
-meta def proveContinuousWithIVars (x integrand : Expr) (ambientIVars : Array Expr) :
-    MetaM Expr :=
+meta def proveContinuousWithIVars (x integrand : Expr) (ambientIVars : Array Expr) : MetaM Expr :=
   withLocalDeclsD
       (ambientIVars.map fun expr => (`ambient, fun _ => inferType expr)) fun ambientVars => do
     let replacements := (ambientIVars.zip ambientVars).foldl
@@ -416,84 +410,72 @@ meta def proveContinuousWithIVars (x integrand : Expr) (ambientIVars : Array Exp
     let proofFn ← mkLambdaFVars ambientVars proof
     return mkAppN proofFn ambientIVars
 
-meta def realUnaryArg (e : Expr) : CertificateGeneratorM Expr := do
+meta def realUnaryArg (e : Expr) : InclusionM Expr := do
   let .app _ a ← whnfR e | failure
   unless ← isDefEq (← inferType a) (mkConst ``Real) do failure
   unless ← isDefEq (← inferType e) (mkConst ``Real) do failure
   return a
 
-meta def realBinaryArgs (e : Expr) : CertificateGeneratorM (Expr × Expr) := do
+meta def realBinaryArgs (e : Expr) : InclusionM (Expr × Expr) := do
   let .app (.app _ a) b ← whnfR e | failure
   unless ← isDefEq (← inferType a) (mkConst ``Real) do failure
   unless ← isDefEq (← inferType b) (mkConst ``Real) do failure
   unless ← isDefEq (← inferType e) (mkConst ``Real) do failure
   return (a, b)
 
-meta def mapPureUnary (body : CertificateBody) (op inclusion : Name) :
-    CertificateGeneratorM CertificateBody := do
-  let .pureBody body := body
-    | throwError "Pure unary interval extension received a meta certificate"
-  let intervalExprBody ← mkAppM op #[body.intervalExprBody]
-  let intervalCompBody ← mkAppM op #[body.intervalCompBody]
-  let intervalProofBody ← mkAppM inclusion #[body.intervalProofBody]
-  return .pureBody ⟨intervalExprBody, intervalCompBody, intervalProofBody⟩
+meta def evalUnary (e : Expr) (op inclusion : Name) : InclusionM ExprInclusionBody := do
+  let body ← mkExprInclusionBody (← realUnaryArg e)
+  return ⟨← mkAppM op #[body.inclusionBody], ← mkAppM inclusion #[body.proofBody]⟩
 
-meta def mapPureBinary (left right : CertificateBody) (op inclusion : Name) :
-    CertificateGeneratorM CertificateBody := do
-  let .pureBody left := left
-    | throwError "Pure binary interval extension received a meta left certificate"
-  let .pureBody right := right
-    | throwError "Pure binary interval extension received a meta right certificate"
-  let intervalExprBody ← mkAppM op #[left.intervalExprBody, right.intervalExprBody]
-  let intervalCompBody ← mkAppM op #[left.intervalCompBody, right.intervalCompBody]
-  let intervalProofBody ←
-    mkAppM inclusion #[left.intervalProofBody, right.intervalProofBody]
-  return .pureBody ⟨intervalExprBody, intervalCompBody, intervalProofBody⟩
-
-meta def evalPureUnary (e : Expr) (op inclusion : Name) :
-    CertificateGeneratorM CertificateBody := do
-  let a ← realUnaryArg e
-  mapPureUnary (← mkCertificateBody a) op inclusion
-
-meta def evalPureBinary (e : Expr) (op inclusion : Name) :
-    CertificateGeneratorM CertificateBody := do
+meta def evalBinary (e : Expr) (op inclusion : Name) : InclusionM ExprInclusionBody := do
   let (a, b) ← realBinaryArgs e
-  let left ← mkCertificateBody a
-  let right ← mkCertificateBody b
-  mapPureBinary left right op inclusion
+  let left ← mkExprInclusionBody a
+  let right ← mkExprInclusionBody b
+  return ⟨← mkAppM op #[left.inclusionBody, right.inclusionBody],
+    ← mkAppM inclusion #[left.proofBody, right.proofBody]⟩
 
-@[intervalExt OfNat.ofNat _]
-meta def evalOfNat : IntervalExt where
+@[inclusionExt OfNat.ofNat _]
+meta def evalOfNat : InclusionExt where
   eval e := do
     let (``OfNat.ofNat, #[α, n, _]) := e.getAppFnArgs | failure
     unless ← isDefEq α (mkConst ``Real) do failure
     guard n.isRawNatLit
-    let intervalBody ← mkAppM ``ofNat #[n]
-    let proofBody ← mkAppM ``ofNat_mem #[n]
-    return .pureBody ⟨intervalBody, intervalBody, proofBody⟩
+    return ⟨← mkAppM ``ofNat #[n], ← mkAppM ``ofNat_mem #[n]⟩
 
-@[intervalExt Neg.neg _]
-meta def evalNeg : IntervalExt where
-  eval e := evalPureUnary e ``neg ``neg_mem
+@[inclusionExt Neg.neg _]
+meta def evalNeg : InclusionExt where
+  eval e := evalUnary e ``neg ``neg_mem
 
-@[intervalExt _ + _]
-meta def evalAdd : IntervalExt where
-  eval e := evalPureBinary e ``add ``add_mem
+@[inclusionExt _ + _]
+meta def evalAdd : InclusionExt where
+  eval e := evalBinary e ``add ``add_mem
 
-@[intervalExt _ - _]
-meta def evalSub : IntervalExt where
-  eval e := evalPureBinary e ``sub ``sub_mem
+@[inclusionExt _ - _]
+meta def evalSub : InclusionExt where
+  eval e := evalBinary e ``sub ``sub_mem
 
-@[intervalExt _ * _]
-meta def evalMul : IntervalExt where
-  eval e := evalPureBinary e ``mul ``mul_mem
+@[inclusionExt _ * _]
+meta def evalMul : InclusionExt where
+  eval e := evalBinary e ``mul ``mul_mem
 
-@[intervalExt _ / _]
-meta def evalDiv : IntervalExt where
-  eval e := evalPureBinary e ``div ``div_mem
+@[inclusionExt _ / _]
+meta def evalDiv : InclusionExt where
+  eval e := evalBinary e ``div ``div_mem
 
-@[intervalExt intervalIntegral (_ : ℝ → ℝ) _ _ volume]
-meta def evalUnitIntegral : IntervalExt where
+@[inclusionExt(_ : ℝ) ≤ (_ : ℝ)]
+meta def evalLe : InclusionExt where
+  eval e := do
+    let (``LE.le, #[_, _, a, b]) := e.getAppFnArgs | failure
+    unless ← isDefEq (← inferType a) (mkConst ``Real) do failure
+    unless ← isDefEq (← inferType b) (mkConst ``Real) do failure
+    unless ← isProp e do failure
+    let left ← mkExprInclusionBody a
+    let right ← mkExprInclusionBody b
+    return ⟨← mkAppM ``le #[left.inclusionBody, right.inclusionBody],
+      ← mkAppM ``le_mem #[left.proofBody, right.proofBody]⟩
+
+@[inclusionExt intervalIntegral (_ : ℝ → ℝ) _ _ volume]
+meta def evalUnitIntegral : InclusionExt where
   eval e := do
     let (``intervalIntegral, #[E, _, _, f, a, b, _]) := e.getAppFnArgs | failure
     unless ← isDefEq E (mkConst ``Real) do failure
@@ -501,33 +483,32 @@ meta def evalUnitIntegral : IntervalExt where
     let some (1, _) ← getOfNatValue? b ``Real | failure
     lambdaTelescope f fun xs integrand => do
       let #[x] := xs | failure
-      withLocalDeclD `integralIntervalExpr q(Interval Dyadic) fun intervalExpr => do
-        withLocalDeclD `integralInterval q(Interval Dyadic) fun interval => do
-          let hypType ← mkIntervalMem x intervalExpr (mkConst ``Dyadic.toReal)
-          withLocalDeclD `integralHyp hypType fun hyp => do
-            let data : IVarData := ⟨x, intervalExpr, interval, hyp⟩
-            modify fun state => { state with ivars := state.ivars.insert x data }
-            let child ← try mkCertificateBody integrand finally
-              modify fun state => { state with ivars := state.ivars.erase x }
-            let ambientIVars := (← get).ivars.toArray.map fun (_, data) => data.exprVar
-            let .pureBody body := child
-              | throwError "The unit-integral extension only supports a pure integrand"
-            let some (genericIntegrand, _, _) :=
-                intervalHyp? (← inferType body.intervalProofBody)
-              | throwError "The integrand proof is not an interval-containment proof"
-            let continuousProof ←
-              proveContinuousWithIVars x genericIntegrand ambientIVars
-            let intervalExprFn ← mkLambdaFVars #[intervalExpr] body.intervalExprBody
-            let intervalCompFn ← mkLambdaFVars #[interval] body.intervalCompBody
-            let proofFn ← mkLambdaFVars #[x, intervalExpr, hyp] body.intervalProofBody
-            let intervalExprBody ← mkAppM ``unitIntegralBound #[intervalExprFn]
-            let intervalCompBody ← mkAppM ``unitIntegralBound #[intervalCompFn]
-            let intervalProofBody ← mkAppM ``unitIntegral_mem
-              #[intervalExprFn, continuousProof, proofFn]
-            return .pureBody ⟨intervalExprBody, intervalCompBody, intervalProofBody⟩
+      let xType ← inferType x
+      let setType ← mkAppM ``Interval #[mkConst ``Dyadic]
+      let toSetInst ← synthInstance (← mkAppM ``ToSet #[setType, xType])
+      withLocalDeclD `integralInterval setType fun interval => do
+        let hypType ← mkToSetMem xType setType x interval toSetInst
+        withLocalDeclD `integralHyp hypType fun hyp => do
+          let data : IVarData := ⟨⟨xType, setType, toSetInst⟩, x, interval, hyp⟩
+          modify fun state => { state with ivars := state.ivars.insert x data }
+          let body ← try mkExprInclusionBody integrand finally
+            modify fun state => { state with ivars := state.ivars.erase x }
+          let ambientIVars := (← get).ivars.toArray.map fun (_, data) => data.exprVar
+          let some (genericIntegrand, _, _) := toSetHyp? (← inferType body.proofBody)
+            | throwError "The integrand proof is not a containment proof"
+          let continuousProof ← proveContinuousWithIVars x genericIntegrand ambientIVars
+          let intervalFn ← mkLambdaFVars #[interval] body.inclusionBody
+          let proofFn ← mkLambdaFVars #[x, interval, hyp] body.proofBody
+          return ⟨← mkAppM ``unitIntegralBound #[intervalFn],
+            ← mkAppM ``unitIntegral_mem #[intervalFn, continuousProof, proofFn]⟩
 
-end
+@[inclusionExt(_ : ℝ)]
+meta def evalRealIVar : InclusionExt where
+  priority := eval_prio high
+  eval e := do
+    unless ← isDefEq (← inferType e) (mkConst ``Real) do failure
+    let setType ← mkAppM ``Interval #[mkConst ``Dyadic]
+    let toSetInst ← synthInstance (← mkAppM ``ToSet #[setType, mkConst ``Real])
+    return (← mkIVar e setType toSetInst).toExprInclusionBody
 
-end MetaInterval
-
-end IntervalArithmetic
+end IntervalArithmetic.Inclusion
