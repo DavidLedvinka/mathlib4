@@ -9,9 +9,7 @@ set_option linter.style.header false
 
 @[expose] public section
 
-open IntervalArithmetic
-
-namespace IntervalArithmetic.Inclusion.Experimental.RocqBenchmark
+namespace Inclusion.Experimental.RocqBenchmark
 
 def mt25Domain : Interval Dyadic := ⟨0, 2⟩
 
@@ -23,4 +21,4 @@ set_option inclusion.large.precision 30 in
         Real.exp (-1.34 * x) > 0 := by
   inclusion [split := 4]
 
-end IntervalArithmetic.Inclusion.Experimental.RocqBenchmark
+end Inclusion.Experimental.RocqBenchmark

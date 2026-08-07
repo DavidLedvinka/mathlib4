@@ -7,7 +7,7 @@ set_option linter.style.header false
 
 @[expose] public section
 
-namespace IntervalArithmetic
+namespace Inclusion
 
 instance : LinearOrder Dyadic where
   le_refl := Std.IsPreorder.le_refl
@@ -23,4 +23,4 @@ theorem Monotone.dyadicToReal : Monotone Dyadic.toReal := by
   intro _ _ h
   simp [Dyadic.toReal, h]
 
-end IntervalArithmetic
+end Inclusion

@@ -3,6 +3,7 @@ module
 public import Mathlib.Tactic.Inclusion.Extension.Interval
 public import Mathlib.Tactic.Inclusion.Extension.Dyadic
 public meta import Mathlib.Tactic.Inclusion.Core.Core
+public import Mathlib.Tactic.Inclusion.Extension.Splitter
 public import Mathlib.Algebra.Order.Field.Basic
 public import Mathlib.Algebra.BigOperators.Group.Finset.Basic
 public import Mathlib.MeasureTheory.Integral.IntervalIntegral.Basic
@@ -15,7 +16,11 @@ set_option linter.style.header false
 open Lean Meta
 open Set MeasureTheory
 
-namespace IntervalArithmetic.Inclusion
+namespace Inclusion
+
+@[inclusionParam]
+meta def splitParam : InclusionParamDecl where
+  name := `split
 
 instance instToSetIntervalDyadicReal : ToSet (Interval Dyadic) ℝ where
   toSet I := (I.map Dyadic.toReal).toSet
@@ -126,6 +131,76 @@ lemma toReal_max (a b : Dyadic) :
   rcases le_total a b with h | h
   · rw [max_eq_right h, max_eq_right (toReal_le_toReal.mpr h)]
   · rw [max_eq_left h, max_eq_left (toReal_le_toReal.mpr h)]
+
+theorem inter_mem {r : ℝ} {I J : Interval Dyadic} (hI : r ∈ I) (hJ : r ∈ J) :
+    r ∈ I.inter J := by
+  constructor
+  · rcases hIl : I.lb with _ | il
+    · simpa [Interval.inter, Interval.map, hIl] using hJ.1
+    rcases hJl : J.lb with _ | jl
+    · simpa [Interval.inter, Interval.map, hIl, hJl] using hI.1
+    have hI' := hI.1
+    have hJ' := hJ.1
+    simp only [Interval.map, hIl] at hI'
+    simp only [Interval.map, hJl] at hJ'
+    simp only [Interval.inter, hIl, hJl, Interval.map]
+    exact WithBot.coe_le_coe.mpr <| by
+      rw [toReal_max]
+      exact max_le (WithBot.coe_le_coe.mp hI') (WithBot.coe_le_coe.mp hJ')
+  · rcases hIu : I.ub with _ | iu
+    · simpa [Interval.inter, Interval.map, hIu] using hJ.2
+    rcases hJu : J.ub with _ | ju
+    · simpa [Interval.inter, Interval.map, hIu, hJu] using hI.2
+    have hI' := hI.2
+    have hJ' := hJ.2
+    simp only [Interval.map, hIu] at hI'
+    simp only [Interval.map, hJu] at hJ'
+    simp only [Interval.inter, hIu, hJu, Interval.map]
+    exact WithTop.coe_le_coe.mpr <| by
+      rw [toReal_min]
+      exact le_min (WithTop.coe_le_coe.mp hI') (WithTop.coe_le_coe.mp hJ')
+
+instance : Univ (Interval Dyadic) ℝ where
+  univ := Interval.univ Dyadic
+  mem_univ := mem_univ
+
+instance : Refine (Interval Dyadic) ℝ where
+  refine := Interval.inter
+  mem_refine := inter_mem
+
+theorem downwardClosure_mem {x y : ℝ} {I : Interval Dyadic}
+    (hxy : x ≤ y) (hy : y ∈ I) : x ∈ I.downwardClosure :=
+  ⟨by simp [Interval.downwardClosure, Interval.map],
+    (WithTop.coe_le_coe.mpr hxy).trans hy.2⟩
+
+theorem upwardClosure_mem {x y : ℝ} {I : Interval Dyadic}
+    (hxy : x ≤ y) (hx : x ∈ I) : y ∈ I.upwardClosure :=
+  ⟨hx.1.trans (WithBot.coe_le_coe.mpr hxy),
+    by simp [Interval.upwardClosure, Interval.map]⟩
+
+theorem lower_of_mem_Ici {x a : ℝ} (hx : x ∈ Set.Ici a) : a ≤ x := Set.mem_Ici.mp hx
+
+theorem lower_of_mem_Ioi {x a : ℝ} (hx : x ∈ Set.Ioi a) : a < x := Set.mem_Ioi.mp hx
+
+theorem upper_of_mem_Iic {x b : ℝ} (hx : x ∈ Set.Iic b) : x ≤ b := Set.mem_Iic.mp hx
+
+theorem upper_of_mem_Iio {x b : ℝ} (hx : x ∈ Set.Iio b) : x < b := Set.mem_Iio.mp hx
+
+theorem lower_of_mem_Ico {x a b : ℝ} (hx : x ∈ Set.Ico a b) : a ≤ x := Set.mem_Ico.mp hx |>.1
+
+theorem upper_of_mem_Ico {x a b : ℝ} (hx : x ∈ Set.Ico a b) : x < b := Set.mem_Ico.mp hx |>.2
+
+theorem lower_of_mem_Ioc {x a b : ℝ} (hx : x ∈ Set.Ioc a b) : a < x := Set.mem_Ioc.mp hx |>.1
+
+theorem upper_of_mem_Ioc {x a b : ℝ} (hx : x ∈ Set.Ioc a b) : x ≤ b := Set.mem_Ioc.mp hx |>.2
+
+theorem lower_of_mem_Icc {x a b : ℝ} (hx : x ∈ Set.Icc a b) : a ≤ x := Set.mem_Icc.mp hx |>.1
+
+theorem upper_of_mem_Icc {x a b : ℝ} (hx : x ∈ Set.Icc a b) : x ≤ b := Set.mem_Icc.mp hx |>.2
+
+theorem lower_of_mem_Ioo {x a b : ℝ} (hx : x ∈ Set.Ioo a b) : a < x := Set.mem_Ioo.mp hx |>.1
+
+theorem upper_of_mem_Ioo {x a b : ℝ} (hx : x ∈ Set.Ioo a b) : x < b := Set.mem_Ioo.mp hx |>.2
 
 lemma min4_mul_le {a b c d x y : ℝ} (hx : a ≤ x ∧ x ≤ b) (hy : c ≤ y ∧ y ≤ d) :
     min (min (a * c) (a * d)) (min (b * c) (b * d)) ≤ x * y := by
@@ -396,19 +471,13 @@ theorem unitIntegral_mem {f : ℝ → ℝ}
   rw [← hpartition']
   simpa [unitIntegralBound] using hsum
 
-meta def proveContinuousWithIVars (x integrand : Expr) (ambientIVars : Array Expr) : MetaM Expr :=
-  withLocalDeclsD
-      (ambientIVars.map fun expr => (`ambient, fun _ => inferType expr)) fun ambientVars => do
-    let replacements := (ambientIVars.zip ambientVars).foldl
-      (init := ({} : ExprMap Expr)) fun result (old, new) => result.insert old new
-    let integrand := integrand.replace fun subterm => replacements[subterm]?
-    let integrandFn ← mkLambdaFVars #[x] integrand
-    let continuousGoal ← mkAppM ``Continuous #[integrandFn]
-    let some proof ←
-      Mathlib.Meta.FunProp.tacticToDischarge (← `(tactic| fun_prop)) continuousGoal
-      | throwError "fun_prop could not prove {continuousGoal}"
-    let proofFn ← mkLambdaFVars ambientVars proof
-    return mkAppN proofFn ambientIVars
+meta def proveContinuous (x integrand : Expr) : MetaM Expr := do
+  let integrandFn ← mkLambdaFVars #[x] integrand
+  let continuousGoal ← mkAppM ``Continuous #[integrandFn]
+  let some proof ←
+    Mathlib.Meta.FunProp.tacticToDischarge (← `(tactic| fun_prop)) continuousGoal
+    | throwError "fun_prop could not prove {continuousGoal}"
+  return proof
 
 meta def realUnaryArg (e : Expr) : InclusionM Expr := do
   let .app _ a ← whnfR e | failure
@@ -433,6 +502,112 @@ meta def evalBinary (e : Expr) (op inclusion : Name) : InclusionM ExprInclusionB
   let right ← mkExprInclusionBody b
   return ⟨← mkAppM op #[left.inclusionBody, right.inclusionBody],
     ← mkAppM inclusion #[left.proofBody, right.proofBody]⟩
+
+inductive HypBoundKind
+  | eqLeft
+  | eqRight
+  | downward
+  | upward
+
+meta def mkHypBoundResult (expr endpoint h : Expr) (iVarType : IType)
+    (kind : HypBoundKind) : InclusionHypM InclusionHypResult := do
+  let fn ← mkHypInclusionFunction endpoint iVarType
+  let bound ← withInclusionParams fn.params fun paramVars => do
+    let args ← inclusionParamArgs fn.params paramVars fn.params
+    let set := (mkAppN fn.inclusion args).headBeta
+    let endpointMem := (mkAppN fn.proof args).headBeta
+    let (set, proof) ← match kind with
+      | .eqLeft => pure (set, ← mkAppM ``ToSet.mem_of_eq_of_mem #[h, endpointMem])
+      | .eqRight => pure (set, ← mkAppM ``ToSet.mem_of_mem_of_eq #[h, endpointMem])
+      | .downward =>
+          pure (← mkAppM ``Interval.downwardClosure #[set],
+            ← mkAppM ``downwardClosure_mem #[h, endpointMem])
+      | .upward =>
+          pure (← mkAppM ``Interval.upwardClosure #[set],
+            ← mkAppM ``upwardClosure_mem #[h, endpointMem])
+    return ⟨fn.params, #[], iVarType,
+      ← mkLambdaFVars paramVars set (binderInfoForMVars := .default),
+      ← mkLambdaFVars paramVars proof (binderInfoForMVars := .default)⟩
+  return ⟨expr, bound⟩
+
+meta def tryHypBoundResult (expr endpoint h : Expr) (iVarType : IType)
+    (kind : HypBoundKind) : InclusionHypM (Option InclusionHypResult) := do
+  let saved ← saveState
+  try
+    return some (← mkHypBoundResult expr endpoint h iVarType kind)
+  catch err =>
+    trace[Tactic.inclusion] "Could not derive a bound for {expr} from {← inferType h} : \
+      {err.toMessageData}"
+    restoreState saved
+    return none
+
+meta def deriveEqualityHyp (h : Expr) : InclusionHypM (Array InclusionHypResult) := do
+  let (``Eq, #[_, left, right]) := (← whnfR (← inferType h)).getAppFnArgs | failure
+  let mut results := #[]
+  if let some { expr, iVarType } ← requestedIVar? left then
+    if let some result ← tryHypBoundResult expr right h iVarType .eqLeft then
+      results := results.push result
+  if let some { expr, iVarType } ← requestedIVar? right then
+    if let some result ← tryHypBoundResult expr left h iVarType .eqRight then
+      results := results.push result
+  return results
+
+@[inclusionHypRule _ = _]
+meta def evalEqualityHyp : InclusionHypRule where
+  derive := deriveEqualityHyp
+
+meta def deriveRealOrderHyp (h : Expr) : InclusionHypM (Array InclusionHypResult) := do
+  let type ← whnfR (← inferType h)
+  let (relation, #[α, _, left, right]) := type.getAppFnArgs | failure
+  unless relation == ``LE.le || relation == ``LT.lt do failure
+  unless ← isDefEq α (mkConst ``Real) do failure
+  let hle ← if relation == ``LT.lt then mkAppM ``le_of_lt #[h] else pure h
+  let mut results := #[]
+  if let some { expr, iVarType } ← requestedIVar? left then
+    if let some result ← tryHypBoundResult expr right hle iVarType .downward then
+      results := results.push result
+  if let some { expr, iVarType } ← requestedIVar? right then
+    if let some result ← tryHypBoundResult expr left hle iVarType .upward then
+      results := results.push result
+  return results
+
+@[inclusionHypRule(_ : ℝ) ≤ (_ : ℝ), (_ : ℝ) < (_ : ℝ)]
+meta def evalRealOrderHyp : InclusionHypRule where
+  derive := deriveRealOrderHyp
+
+meta def deriveSetIntervalHyp (h : Expr) : InclusionHypM (Array InclusionHypResult) := do
+  let (``Membership.mem, #[_, _, _, set, _]) := (← whnfR (← inferType h)).getAppFnArgs | failure
+  let mut inequalities := #[]
+  match set.getAppFnArgs with
+  | (``Set.Ici, _) =>
+      inequalities := inequalities.push (← mkAppM ``lower_of_mem_Ici #[h])
+  | (``Set.Ioi, _) =>
+      inequalities := inequalities.push (← mkAppM ``lower_of_mem_Ioi #[h])
+  | (``Set.Iic, _) =>
+      inequalities := inequalities.push (← mkAppM ``upper_of_mem_Iic #[h])
+  | (``Set.Iio, _) =>
+      inequalities := inequalities.push (← mkAppM ``upper_of_mem_Iio #[h])
+  | (``Set.Ico, _) =>
+      inequalities := inequalities.push (← mkAppM ``lower_of_mem_Ico #[h])
+      inequalities := inequalities.push (← mkAppM ``upper_of_mem_Ico #[h])
+  | (``Set.Ioc, _) =>
+      inequalities := inequalities.push (← mkAppM ``lower_of_mem_Ioc #[h])
+      inequalities := inequalities.push (← mkAppM ``upper_of_mem_Ioc #[h])
+  | (``Set.Icc, _) =>
+      inequalities := inequalities.push (← mkAppM ``lower_of_mem_Icc #[h])
+      inequalities := inequalities.push (← mkAppM ``upper_of_mem_Icc #[h])
+  | (``Set.Ioo, _) =>
+      inequalities := inequalities.push (← mkAppM ``lower_of_mem_Ioo #[h])
+      inequalities := inequalities.push (← mkAppM ``upper_of_mem_Ioo #[h])
+  | _ => failure
+  let mut results := #[]
+  for inequality in inequalities do
+    results := results ++ (← deriveRealOrderHyp inequality)
+  return results
+
+@[inclusionHypRule(_ : ℝ) ∈ (_ : Set ℝ)]
+meta def evalSetIntervalHyp : InclusionHypRule where
+  derive := deriveSetIntervalHyp
 
 @[inclusionExt OfNat.ofNat _]
 meta def evalOfNat : InclusionExt where
@@ -483,20 +658,20 @@ meta def evalUnitIntegral : InclusionExt where
     let some (1, _) ← getOfNatValue? b ``Real | failure
     lambdaTelescope f fun xs integrand => do
       let #[x] := xs | failure
+      let continuousProof ← proveContinuous x integrand
       let xType ← inferType x
       let setType ← mkAppM ``Interval #[mkConst ``Dyadic]
       let toSetInst ← synthInstance (← mkAppM ``ToSet #[setType, xType])
       withLocalDeclD `integralInterval setType fun interval => do
-        let hypType ← mkToSetMem xType setType x interval toSetInst
+        let iexpr : IExpr := ⟨⟨xType, setType, toSetInst⟩, x⟩
+        let hypType ← iexpr.mkMem interval
         withLocalDeclD `integralHyp hypType fun hyp => do
-          let data : IVarData := ⟨⟨xType, setType, toSetInst⟩, x, interval, hyp⟩
-          modify fun state => { state with ivars := state.ivars.insert x data }
+          let coverCheck ← mkAppOptM ``CoverCheck.self
+            #[setType, xType, toSetInst]
+          let iVar : IVar := { iexpr, setVar := interval, hypVar := hyp, coverCheck }
+          modify fun state => { state with ivars := state.ivars.insert iVar.expr iVar }
           let body ← try mkExprInclusionBody integrand finally
             modify fun state => { state with ivars := state.ivars.erase x }
-          let ambientIVars := (← get).ivars.toArray.map fun (_, data) => data.exprVar
-          let some (genericIntegrand, _, _) := toSetHyp? (← inferType body.proofBody)
-            | throwError "The integrand proof is not a containment proof"
-          let continuousProof ← proveContinuousWithIVars x genericIntegrand ambientIVars
           let intervalFn ← mkLambdaFVars #[interval] body.inclusionBody
           let proofFn ← mkLambdaFVars #[x, interval, hyp] body.proofBody
           return ⟨← mkAppM ``unitIntegralBound #[intervalFn],
@@ -509,6 +684,13 @@ meta def evalRealIVar : InclusionExt where
     unless ← isDefEq (← inferType e) (mkConst ``Real) do failure
     let setType ← mkAppM ``Interval #[mkConst ``Dyadic]
     let toSetInst ← synthInstance (← mkAppM ``ToSet #[setType, mkConst ``Real])
-    return (← mkIVar e setType toSetInst).toExprInclusionBody
+    let coverCheck ← if let some depth ← getParam? `split then
+      let splitterType ← mkAppOptM ``Splitter #[setType, mkConst ``Real, toSetInst]
+      let splitter ← synthInstance splitterType
+      mkAppOptM ``Splitter.coverCheck
+        #[setType, mkConst ``Real, toSetInst, splitter, depth]
+    else
+      mkAppOptM ``CoverCheck.self #[setType, mkConst ``Real, toSetInst]
+    return (← mkIVar e setType toSetInst coverCheck).toExprInclusionBody
 
-end IntervalArithmetic.Inclusion
+end Inclusion

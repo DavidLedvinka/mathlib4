@@ -8,9 +8,7 @@ set_option linter.style.header false
 
 @[expose] public section
 
-open IntervalArithmetic
-
-namespace IntervalArithmetic.Inclusion.Experimental.SplittingBenchmark
+namespace Inclusion.Experimental.SplittingBenchmark
 
 def unitInterval : Interval Dyadic := ⟨1, 2⟩
 
@@ -23,4 +21,4 @@ def unitInterval : Interval Dyadic := ⟨1, 2⟩
     (x - x) + (y - y) ≤ 1 / 32 := by
   inclusion [split := 6]
 
-end IntervalArithmetic.Inclusion.Experimental.SplittingBenchmark
+end Inclusion.Experimental.SplittingBenchmark

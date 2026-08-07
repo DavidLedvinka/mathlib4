@@ -11,7 +11,7 @@ set_option warn.sorry false
 
 open Lean Meta
 
-namespace IntervalArithmetic.Inclusion.Experimental.RocqBenchmark
+namespace Inclusion.Experimental.RocqBenchmark
 
 /-- Number of alternating-series terms used by the benchmark-only trigonometric evaluator. -/
 def trigTerms (prec : ℕ) : ℕ := prec / 8 + 7
@@ -169,4 +169,4 @@ meta def evalCos : InclusionExt where
     return ⟨← mkAppM ``cos #[prec, body.inclusionBody],
       ← mkAppM ``cos_mem #[prec, body.proofBody]⟩
 
-end IntervalArithmetic.Inclusion.Experimental.RocqBenchmark
+end Inclusion.Experimental.RocqBenchmark

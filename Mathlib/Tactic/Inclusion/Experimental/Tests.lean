@@ -8,9 +8,8 @@ set_option linter.style.header false
 @[expose] public section
 
 open Lean Meta
-open IntervalArithmetic
 
-namespace IntervalArithmetic.Inclusion.Tests
+namespace Inclusion.Tests
 
 def unitInterval : Interval Dyadic := ⟨1, 2⟩
 
@@ -97,8 +96,96 @@ meta def evalTrue : InclusionExt where
     unless e.isConstOf ``True do failure
     return ⟨mkConst ``IntervalBool.true, mkConst ``true_mem⟩
 
+@[inclusionParam]
+meta def testParam : InclusionParamDecl where
+  name := `testParam
+  enabledByDefault := true
+  defaultValue := 7
+
+def parameterizedTrue : Prop := True
+
+def parameterizedTrueCheck (n : Nat) : IntervalBool :=
+  if n = 7 then .true else .undetermined
+
+theorem parameterizedTrue_mem (n : Nat) : parameterizedTrue ∈ parameterizedTrueCheck n := by
+  unfold parameterizedTrueCheck
+  split
+  · exact Inclusion.mem_intervalBool_true trivial
+  · exact Inclusion.mem_intervalBool_undetermined _
+
+@[inclusionExt parameterizedTrue]
+meta def evalParameterizedTrue : InclusionExt where
+  eval e := do
+    unless e.isConstOf ``parameterizedTrue do failure
+    let some n ← getParam? `testParam | failure
+    return ⟨← mkAppM ``parameterizedTrueCheck #[n], ← mkAppM ``parameterizedTrue_mem #[n]⟩
+
+def parameterizedBound : ℝ := 1
+
+def parameterizedBoundInterval (n : Nat) : Interval Dyadic :=
+  if n = 7 then Inclusion.ofNat 1 else Interval.univ Dyadic
+
+theorem parameterizedBound_mem (n : Nat) : parameterizedBound ∈ parameterizedBoundInterval n := by
+  simp only [parameterizedBoundInterval]
+  split
+  · simpa [parameterizedBound] using Inclusion.ofNat_mem 1
+  · exact Inclusion.mem_univ _
+
+@[inclusionExt parameterizedBound]
+meta def evalParameterizedBound : InclusionExt where
+  eval e := do
+    unless e.isConstOf ``parameterizedBound do failure
+    let some n ← getParam? `testParam | failure
+    return ⟨← mkAppM ``parameterizedBoundInterval #[n],
+      ← mkAppM ``parameterizedBound_mem #[n]⟩
+
 example : True := by
   inclusion
+
+example : parameterizedTrue := by
+  inclusion
+
+example : True := by
+  fail_if_success
+    have : parameterizedTrue := by
+      inclusion [testParam := 6]
+  trivial
+
+run_meta
+  let enabled := ({} : NameSet).insert `testParam
+  let fn ← toCoveredExprInclusionFunction (mkConst ``parameterizedTrue) enabled
+  let check ← compileInclusionCheck fn
+  match check #[6], check #[7] with
+  | .undetermined, .true => pure ()
+  | _, _ => throwError "Compiled inclusion parameters cannot be varied without recompilation"
+
+run_meta
+  withLocalDeclD `x (mkConst ``Real) fun x => do
+    let bound := mkConst ``parameterizedBound
+    let hypType ← mkAppM ``LE.le #[x, bound]
+    withLocalDeclD `hx hypType fun _hx => do
+      let one ← mkNumeral (mkConst ``Real) 1
+      let target ← mkAppM ``LE.le #[x, one]
+      let enabled := ({} : NameSet).insert `testParam
+      let raw ← toCoveredExprInclusionFunction target enabled
+      let closed ← raw.closeWithBounds (← mkInclusionHypBounds raw enabled)
+      let check ← compileInclusionCheck closed
+      match check #[6], check #[7] with
+      | .undetermined, .true => pure ()
+      | _, _ => throwError "Hypothesis-bound parameters cannot be varied without recompilation"
+
+run_meta
+  withLocalDeclD `x (mkConst ``Real) fun x => do
+    let one ← mkNumeral (mkConst ``Real) 1
+    let target ← mkAppM ``LE.le #[x, one]
+    let raw ← toCoveredExprInclusionFunction target
+    let closed ← raw.closeWithBounds (← mkInclusionHypBounds raw {})
+    unless closed.iexprs.isEmpty do
+      throwError "Universal hypothesis preprocessing did not close all inclusion variables"
+    let check ← compileInclusionCheck closed
+    match check #[] with
+    | .undetermined => pure ()
+    | _ => throwError "An unbounded inclusion variable unexpectedly verified the test inequality"
 
 example : metaValue ≤ 2 := by
   inclusion
@@ -132,6 +219,48 @@ example : (1 : ℝ) / 3 ≤ 334 / 1000 := by
 example {x y : ℝ} (hx : x ∈ unitInterval) (hy : y ∈ positiveInterval) : x + y ≤ 6 := by
   inclusion
 
+example {x : ℝ} (hx₁ : 1 ≤ x) (hx₂ : x ≤ 2) : x + x ≤ 4 := by
+  inclusion
+
+example {x : ℝ} (hx : x < 2) : x + x ≤ 4 := by
+  inclusion
+
+example {x : ℝ} (hx₁ : x ∈ unitInterval) (hx₂ : x ≤ 3) : x + x ≤ 4 := by
+  inclusion
+
+example {x : ℝ} (hx : x = 2) : x + x ≤ 4 := by
+  inclusion
+
+example {x : ℝ} (hx : 2 = x) : x + x ≤ 4 := by
+  inclusion
+
+example {x : ℝ} (hx : x ∈ Set.Ici 1) : -x ≤ -1 := by
+  inclusion
+
+example {x : ℝ} (hx : x ∈ Set.Ioi 1) : -x ≤ -1 := by
+  inclusion
+
+example {x : ℝ} (hx : x ∈ Set.Iic 2) : x + x ≤ 4 := by
+  inclusion
+
+example {x : ℝ} (hx : x ∈ Set.Iio 2) : x + x ≤ 4 := by
+  inclusion
+
+example {x : ℝ} (hx : x ∈ Set.Ico 1 2) : x + x ≤ 4 := by
+  inclusion
+
+example {x : ℝ} (hx : x ∈ Set.Ioc 1 2) : x + x ≤ 4 := by
+  inclusion
+
+example {x : ℝ} (hx : x ∈ Set.Icc 1 2) : x + x ≤ 4 := by
+  inclusion
+
+example {x : ℝ} (hx : x ∈ Set.Ioo 1 2) : x + x ≤ 4 := by
+  inclusion
+
+example {x : ℝ} (hx : x ≤ parameterizedBound) : x ≤ 1 := by
+  inclusion
+
 example {x : ℝ} (hx : x ∈ unitInterval) : x + x ≤ 4 := by
   inclusion
 
@@ -163,6 +292,9 @@ def unsupportedValue (x : ℝ) : ℝ := x
 example {x : ℝ} (hx : unsupportedValue x ∈ unitInterval) : unsupportedValue x + 1 ≤ 3 := by
   inclusion
 
+example {x : ℝ} (hx : unsupportedValue x ≤ 2) : unsupportedValue x + 1 ≤ 3 := by
+  inclusion
+
 example (_x : ℝ) : True := by
   fail_if_success
     have : _x ≤ 1 := by
@@ -178,9 +310,10 @@ example {x y : ℝ} (_hx : x ∈ unitInterval) (_hy : y ∈ zeroInterval) : True
 run_meta
   withLocalDeclD `x (mkConst ``Real) fun x => do
     let e ← mkAppM ``HAdd.hAdd #[x, x]
-    let fn ← toExprInclusionFunction e
-    unless fn.ivars.size == 1 do
-      throwError "Expected repeated expressions to share one inclusion variable"
+    InclusionM.run do
+      discard <| mkExprInclusionBody e
+      unless (← get).ivars.size == 1 do
+        throwError "Expected repeated expressions to share one inclusion variable"
 
 run_meta
   let succeeded ← try
@@ -194,4 +327,4 @@ run_meta
   if succeeded then
     throwError "A binder-dependent expression must not be used as an inclusion variable"
 
-end IntervalArithmetic.Inclusion.Tests
+end Inclusion.Tests

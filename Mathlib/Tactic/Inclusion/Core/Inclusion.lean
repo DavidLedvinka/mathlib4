@@ -1,54 +1,133 @@
 module
 
-public import Mathlib.Tactic.Inclusion.Core.Prod
+public meta import Mathlib.Tactic.Inclusion.Core.Expr
 public import Lean.Compiler.IR.CompilerM
 public meta import Lean.Elab.Term.TermElabM
 
 set_option linter.style.header false
 
-@[expose] public section
+public meta section
 
 open Lean Meta Elab Term
 
-namespace IntervalArithmetic
+namespace Inclusion
 
 initialize registerTraceClass `Tactic.inclusion
 
-structure ExprInclusionFunction where
-  ivars : Array Expr
-  iVarTypes : Array IVarType
-  outputType : IVarType
-  /- `f : α₁ → ... → αₙ → β` such that `f ivars = e` -/
-  expr : Expr
-  /- `F : Iα₁ → ... → Iαₙ → Iβ` -/
-  inclusion : Expr
-  /- The curried containment proof for `F` and `f`. -/
-  proof : Expr
+structure InclusionParamDecl where
+  name : Name
+  enabledByDefault : Bool := false
+  defaultValue : Nat := 0
 
-def ExprInclusionFunction.uncurry (fn : ExprInclusionFunction) :
-    MetaM UncurriedInclusion := do
-  let result ← uncurryInclusion fn.iVarTypes fn.expr fn.inclusion fn.proof
-  let expectedProofType ← mkAppOptM ``IsInclusionFunction
-    #[result.iVarType.setType, result.iVarType.exprType, fn.outputType.setType,
-      fn.outputType.exprType, result.iVarType.toSetInst, fn.outputType.toSetInst,
-      result.inclusion, result.expr]
-  unless ← isDefEq (← inferType result.proof) expectedProofType do
-    throwError "Inclusion extension returned a proof with an unexpected type"
+structure InclusionParams where
+  decls : Array InclusionParamDecl := #[]
+  deriving Inhabited
+
+def mkInclusionParamDecl (n : Name) : ImportM InclusionParamDecl := do
+  let { env, opts, .. } ← read
+  IO.ofExcept <| unsafe env.evalConstCheck InclusionParamDecl opts ``InclusionParamDecl n
+
+initialize inclusionParamExt :
+    ScopedEnvExtension Name (Name × InclusionParamDecl) InclusionParams ←
+  registerScopedEnvExtension {
+    mkInitial := pure {}
+    ofOLeanEntry := fun _ n => return (n, ← mkInclusionParamDecl n)
+    toOLeanEntry := (·.1)
+    addEntry := fun state (_, decl) => { state with decls := state.decls.push decl }
+  }
+
+syntax (name := inclusionParamAttr) "inclusionParam" : attr
+
+/-- The `inclusionParam` attribute registers a named natural-number inclusion parameter. -/
+initialize registerBuiltinAttribute {
+  name := `inclusionParamAttr
+  descr := "registers an inclusion-tactic parameter"
+  applicationTime := .afterCompilation
+  add := fun declName _ kind => do
+    let env ← getEnv
+    ensureAttrDeclIsMeta `inclusionParam declName kind
+    unless (env.getModuleIdxFor? declName).isNone do
+      throwError "invalid attribute `inclusionParam`, declaration is in an imported module"
+    if (IR.getSorryDep env declName).isSome then return
+    let decl ← mkInclusionParamDecl declName
+    let params := inclusionParamExt.getState env
+    if params.decls.any fun existing => existing.name == decl.name then
+      throwError "Inclusion parameter '{decl.name}' is already registered"
+    inclusionParamExt.add (declName, decl) kind
+}
+
+def InclusionParams.find? (params : InclusionParams) (name : Name) : Option InclusionParamDecl :=
+  params.decls.find? fun decl => decl.name == name
+
+def mergeInclusionParams (params more : Array Name) : Array Name :=
+  more.foldl (fun params name => if params.contains name then params else params.push name) params
+
+def inclusionParamArgs (params : Array Name) (paramVars : Array Expr)
+    (wanted : Array Name) : MetaM (Array Expr) :=
+  wanted.mapM fun name => do
+    let some i := params.findIdx? (· == name)
+      | throwError "Internal error: inclusion parameter '{name}' was not abstracted"
+    return paramVars[i]!
+
+def withInclusionParams {α : Type} (params : Array Name)
+    (k : Array Expr → MetaM α) : MetaM α := do
+  let some result ← withLocalDeclsD
+      (params.map fun name => (name, fun _ => pure (mkConst ``Nat))) fun paramVars =>
+        some <$> k paramVars
+    | throwError "Internal error while introducing inclusion parameters"
   return result
 
-structure ExprInclusionBody where
-  inclusionBody : Expr
-  proofBody : Expr
-
-def IVarData.toExprInclusionBody (data : IVarData) : ExprInclusionBody :=
-  ⟨data.setVar, data.hypVar⟩
+/-- Close an inclusion function by substituting a closed inclusion function for every inclusion
+variable. Parameter names are merged, so all computations remain reusable while their concrete
+natural-number values are chosen later. -/
+def ExprInclusionFunction.closeWithBounds (fn : ExprInclusionFunction)
+    (bounds : Array ExprInclusionFunction) : MetaM ExprInclusionFunction := do
+  unless fn.iexprs.size = bounds.size do
+    throwError "Internal error: the inclusion function and its bounds have different lengths"
+  if fn.iexprs.isEmpty then
+    return fn
+  let mut params := fn.params
+  for bound in bounds do
+    unless bound.iexprs.isEmpty do
+      throwError "A hypothesis bound depends on an unbounded inclusion variable"
+    params := mergeInclusionParams params bound.params
+  withInclusionParams params fun paramVars => do
+    let fnParamArgs ← inclusionParamArgs params paramVars fn.params
+    let inclusionFn := (mkAppN fn.inclusion fnParamArgs).headBeta
+    let proofFn := (mkAppN fn.proof fnParamArgs).headBeta
+    let mut sets := Array.mkEmpty bounds.size
+    let mut hyps := Array.mkEmpty bounds.size
+    for h : i in [:bounds.size] do
+      let bound := bounds[i]
+      let some expected := fn.iexprs[i]?
+        | throwError "Internal error: missing inclusion variable"
+      let expectedType := expected.iVarType
+      unless ← isDefEq bound.outputType.elemType expectedType.elemType do
+        throwError "A hypothesis bound has expression type {bound.outputType.elemType}, expected \
+          {expectedType.elemType}"
+      unless ← isDefEq bound.outputType.setType expectedType.setType do
+        throwError "A hypothesis bound has set type {bound.outputType.setType}, expected \
+          {expectedType.setType}"
+      unless ← isDefEq bound.outputType.toSetInst expectedType.toSetInst do
+        throwError "A hypothesis bound uses an unexpected `ToSet` instance"
+      let boundParamArgs ← inclusionParamArgs params paramVars bound.params
+      sets := sets.push ((mkAppN bound.inclusion boundParamArgs).headBeta)
+      hyps := hyps.push ((mkAppN bound.proof boundParamArgs).headBeta)
+    let inclusionBody := mkAppN inclusionFn sets
+    let inclusion ← mkLambdaFVars paramVars inclusionBody
+      (binderInfoForMVars := .default)
+    let proofBody := mkAppN proofFn (sets ++ hyps)
+    let proof ← mkLambdaFVars paramVars proofBody (binderInfoForMVars := .default)
+    return ⟨params, #[], fn.outputType, inclusion, proof⟩
 
 structure InclusionM.Context where
   localContext : LocalContext
   localInstances : LocalInstances
+  enabledParams : NameSet
 
 structure InclusionM.State where
-  ivars : ExprMap IVarData := {}
+  ivars : ExprMap IVar := {}
+  params : Array InclusionParam := #[]
 
 abbrev InclusionM := ReaderT InclusionM.Context <| StateT InclusionM.State MetaM
 
@@ -58,12 +137,25 @@ instance : MonadBacktrack (Meta.SavedState × InclusionM.State) InclusionM where
     s.1.restore
     set s.2
 
-def InclusionM.run {α : Type} (x : InclusionM α) : MetaM α := do
+def InclusionM.run {α : Type} (x : InclusionM α) (enabledParams : NameSet := {}) : MetaM α := do
   let localContext ← getLCtx
   let localInstances ← getLocalInstances
-  StateT.run' (ReaderT.run x { localContext, localInstances }) {}
+  StateT.run' (ReaderT.run x { localContext, localInstances, enabledParams }) {}
 
-def mkIVar (e setType toSetInst : Expr) : InclusionM IVarData := do
+def getParam? (name : Name) : InclusionM (Option Expr) := do
+  let registered := (inclusionParamExt.getState (← getEnv)).find? name
+  unless registered.isSome do
+    throwError "Unknown inclusion parameter '{name}'"
+  unless (← read).enabledParams.contains name do return none
+  if let some param := (← get).params.find? fun param => param.name == name then
+    return some param.exprVar
+  let ctx ← read
+  let exprVar ←
+    mkFreshExprMVarAt ctx.localContext ctx.localInstances (mkConst ``Nat) .syntheticOpaque
+  modify fun state => { state with params := state.params.push ⟨name, exprVar⟩ }
+  return some exprVar
+
+def mkIVar (e setType toSetInst coverCheck : Expr) : InclusionM IVar := do
   let ctx ← read
   unless ← MetavarContext.isWellFormed ctx.localContext e do
     throwError "Cannot create an inclusion variable for {e} because it depends on variables \
@@ -78,41 +170,82 @@ def mkIVar (e setType toSetInst : Expr) : InclusionM IVarData := do
   unless ← MetavarContext.isWellFormed ctx.localContext toSetInst do
     throwError "Cannot use the `ToSet` instance for {e} because it depends on variables introduced \
       while constructing the inclusion function"
-  let exprVar ←
-    mkFreshExprMVarAt ctx.localContext ctx.localInstances eType .syntheticOpaque
+  let iexpr : IExpr := ⟨⟨eType, setType, toSetInst⟩, e⟩
   let setVar ←
     mkFreshExprMVarAt ctx.localContext ctx.localInstances setType .syntheticOpaque
-  let hypType ← mkToSetMem eType setType exprVar setVar toSetInst
+  let hypType ← iexpr.mkMem setVar
   let hypVar ←
     mkFreshExprMVarAt ctx.localContext ctx.localInstances hypType .syntheticOpaque
-  let data := ⟨⟨eType, setType, toSetInst⟩, exprVar, setVar, hypVar⟩
-  modify fun state => { state with ivars := state.ivars.insert e data }
-  return data
+  let iVar := { iexpr, setVar, hypVar, coverCheck }
+  modify fun state => { state with ivars := state.ivars.insert iVar.expr iVar }
+  return iVar
+
+partial def mkCoveredInclusionValueAux (inclusion : Expr) (ivars : Array IVar)
+    (i : Nat) (pieces : Array Expr) : MetaM Expr := do
+  if h : i < ivars.size then
+    let iVar := ivars[i]
+    withLocalDeclD `checkedSet iVar.type.setType fun piece => do
+      let inner ← mkCoveredInclusionValueAux inclusion ivars (i + 1) (pieces.push piece)
+      mkCoverCheck iVar.type iVar.setVar iVar.coverCheck (← mkLambdaFVars #[piece] inner)
+  else
+    return mkAppN inclusion pieces
+
+partial def mkCoveredInclusionProofAux (target inclusion proof : Expr) (ivars : Array IVar)
+    (i : Nat) (pieces pieceHyps : Array Expr) : MetaM Expr := do
+  if h : i < ivars.size then
+    let iVar := ivars[i]
+    withLocalDeclD `checkedSet iVar.type.setType fun piece => do
+      let inner ← mkCoveredInclusionValueAux inclusion ivars (i + 1) (pieces.push piece)
+      let predicate ← mkLambdaFVars #[piece] inner
+      let pieceHypType ← iVar.iexpr.mkMem piece
+      withLocalDeclD `checkedSetHyp pieceHypType fun pieceHyp => do
+        let next ← mkCoveredInclusionProofAux target inclusion proof ivars (i + 1)
+          (pieces.push piece) (pieceHyps.push pieceHyp)
+        let pieceProof ← mkLambdaFVars #[piece, pieceHyp] next
+        mkAppOptM ``CoverCheck.mem_check
+          #[iVar.type.setType, iVar.type.elemType, iVar.type.toSetInst,
+            iVar.coverCheck, iVar.setVar, predicate, target, iVar.expr, iVar.hypVar, pieceProof]
+  else
+    return mkAppN (mkAppN proof pieces) pieceHyps
 
 def mkExprInclusionFunction (e : Expr) (body : ExprInclusionBody) :
     InclusionM ExprInclusionFunction := do
   let state ← get
-  let (ivars, iVarDatas) := state.ivars.toArray.unzip
-  let exprVars := iVarDatas.map (·.exprVar)
-  let setVars := iVarDatas.map (·.setVar)
-  let hypVars := iVarDatas.map (·.hypVar)
-  let iVarTypes := iVarDatas.map (·.iVarType)
-  let exprBody := e.replace fun subterm => state.ivars[subterm]?.map (·.exprVar)
+  let ivars := state.ivars.toArray.map (·.2)
+  let paramVars := state.params.map (·.exprVar)
+  let setVars := ivars.map (·.setVar)
+  let hypVars := ivars.map (·.hypVar)
   let bodyProofType ← inferType body.proofBody
-  let some (outputExpr, outputSet, outputToSetInst) := toSetHyp? bodyProofType
+  let some (outputExpr, outputSet, outputToSetInst) := toSetMem? bodyProofType
     | throwError "Inclusion extension returned a proof of {bodyProofType}, expected a containment \
         proof using a `ToSet` instance"
-  unless ← isDefEq outputExpr exprBody do
+  unless ← isDefEq outputExpr e do
     throwError "Inclusion extension returned a proof for an unexpected expression"
   unless ← isDefEq outputSet body.inclusionBody do
     throwError "Inclusion extension returned a proof for an unexpected inclusion"
-  let outputType : IVarType :=
-    ⟨← inferType outputExpr, ← inferType outputSet, outputToSetInst⟩
-  let curriedExpr ← mkLambdaFVars exprVars exprBody (binderInfoForMVars := .default)
-  let curriedInclusion ← mkLambdaFVars setVars body.inclusionBody (binderInfoForMVars := .default)
-  let curriedProof ← mkLambdaFVars (exprVars ++ setVars ++ hypVars) body.proofBody
+  let outputType := ⟨← inferType outputExpr, ← inferType outputSet, outputToSetInst⟩
+  let inclusion ← mkLambdaFVars (paramVars ++ setVars) body.inclusionBody
     (binderInfoForMVars := .default)
-  return ⟨ivars, iVarTypes, outputType, curriedExpr, curriedInclusion, curriedProof⟩
+  let proof ← mkLambdaFVars (paramVars ++ setVars ++ hypVars) body.proofBody
+    (binderInfoForMVars := .default)
+  return ⟨state.params.map (·.name), ivars.map (·.iexpr), outputType, inclusion, proof⟩
+
+def mkCoveredExprInclusionFunction (e : Expr) (fn : ExprInclusionFunction) :
+    InclusionM ExprInclusionFunction := do
+  let state ← get
+  let ivars := state.ivars.toArray.map (·.2)
+  let paramVars := state.params.map (·.exprVar)
+  let setVars := ivars.map (·.setVar)
+  let hypVars := ivars.map (·.hypVar)
+  let inclusion := (mkAppN fn.inclusion paramVars).headBeta
+  let inclusionProof := (mkAppN fn.proof paramVars).headBeta
+  let inclusionBody ← mkCoveredInclusionValueAux inclusion ivars 0 #[]
+  let coveredInclusion ← mkLambdaFVars (paramVars ++ setVars) inclusionBody
+    (binderInfoForMVars := .default)
+  let proofBody ← mkCoveredInclusionProofAux e inclusion inclusionProof ivars 0 #[] #[]
+  let coveredProof ← mkLambdaFVars (paramVars ++ setVars ++ hypVars) proofBody
+    (binderInfoForMVars := .default)
+  return { fn with inclusion := coveredInclusion, proof := coveredProof }
 
 structure InclusionExt where
   name : Name := by exact decl_name%
@@ -201,9 +334,16 @@ def mkExprInclusionBody (e : Expr) : InclusionM ExprInclusionBody := do
         restoreState s
   throwError "No inclusion extension applies to {e}"
 
-def toExprInclusionFunction (e : Expr) : MetaM ExprInclusionFunction :=
-  InclusionM.run do
+def toExprInclusionFunction (e : Expr) (enabledParams : NameSet := {}) :
+    MetaM ExprInclusionFunction :=
+  InclusionM.run (enabledParams := enabledParams) do
     let body ← mkExprInclusionBody e
     mkExprInclusionFunction e body
 
-end IntervalArithmetic
+def toCoveredExprInclusionFunction (e : Expr) (enabledParams : NameSet := {}) :
+    MetaM ExprInclusionFunction :=
+  InclusionM.run (enabledParams := enabledParams) do
+    let body ← mkExprInclusionBody e
+    mkCoveredExprInclusionFunction e (← mkExprInclusionFunction e body)
+
+end Inclusion

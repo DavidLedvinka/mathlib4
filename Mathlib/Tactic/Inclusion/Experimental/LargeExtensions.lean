@@ -12,7 +12,7 @@ set_option warn.sorry false
 
 open Lean Meta
 
-namespace IntervalArithmetic.Inclusion.Large
+namespace Inclusion.Large
 
 public meta section
 
@@ -527,4 +527,4 @@ meta def evalGt : InclusionExt where
     return ⟨← mkAppM ``lt #[left.inclusionBody, right.inclusionBody],
       ← mkAppM ``lt_mem #[left.proofBody, right.proofBody]⟩
 
-end IntervalArithmetic.Inclusion.Large
+end Inclusion.Large

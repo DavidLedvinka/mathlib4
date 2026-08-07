@@ -9,9 +9,7 @@ set_option linter.style.header false
 
 @[expose] public section
 
-open IntervalArithmetic
-
-namespace IntervalArithmetic.Inclusion.Experimental.KernelCacheBenchmark
+namespace Inclusion.Experimental.KernelCacheBenchmark
 
 def domain : Interval Dyadic := ⟨1, 2⟩
 
@@ -37,4 +35,4 @@ set_option inclusion.large.precision 30 in
     (Real.exp (x + y) - Real.exp (x + y)) + (x - y) < 100 := by
   inclusion [split := 4]
 
-end IntervalArithmetic.Inclusion.Experimental.KernelCacheBenchmark
+end Inclusion.Experimental.KernelCacheBenchmark
