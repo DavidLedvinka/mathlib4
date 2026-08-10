@@ -27,8 +27,8 @@ def getParam? (name : Name) : InclusionM (Option Expr) := do
     return some exprVar
   let some param := (inclusionParamExt.getState (← getEnv)).find? name
     | throwError "Unknown inclusion parameter '{name}'"
-  let enabled := param.enabledByDefault || (← read).enabledParams.contains name
-  unless enabled do return none
+  unless param.defaultValue.isSome || (← read).enabledParams.contains name do
+    return none
   let ctx ← read
   let exprVar ←
     mkFreshExprMVarAt ctx.localContext ctx.localInstances (mkConst ``Nat) .syntheticOpaque
@@ -65,10 +65,9 @@ def mkIVar (e setType toSetInst : Expr) (cover : Option Expr := none) : Inclusio
 
 /-- Construct a closed inclusion function for `e` with the expected output type. -/
 def toClosedExprInclusionFunction (e : Expr) (expected : IType)
-    (enabledParams : NameSet := {}) (enabledFamilies : NameSet := {}) :
+    (enabledParams : NameSet := {}) (enabledFamilies : Array Name := #[]) :
     MetaM ExprInclusionFunction := do
-  let fn ← toExprInclusionFunction e (enabledParams := enabledParams)
-    (enabledFamilies := enabledFamilies)
+  let fn ← toExprInclusionFunction e enabledParams enabledFamilies
   unless fn.iExprs.isEmpty do
     throwError "The inclusion function for {e} depends on inclusion variables"
   if fn.inclusion.hasFVar then
@@ -78,20 +77,20 @@ def toClosedExprInclusionFunction (e : Expr) (expected : IType)
   ensureOutputType fn.outputType expected
   return fn
 
-/-- An inclusion hypothesis for one of the inclusion variables requested by the target
+/-- An inclusion hypothesis for one of the inclusion variables requested by the goal
 computation. -/
 structure InclusionHypResult where
   expr : Expr
   hyp : ExprInclusionFunction
 
-/-- Find the canonical target inclusion variable definitionally equal to `e`. Exact expression
+/-- Find the canonical goal inclusion variable definitionally equal to `e`. Exact expression
 matching is attempted first and does not invoke the elaborator. -/
 def requestedIVar? (e : Expr) : HypothesisM (Option IExpr) := do
   let ctx ← read
   if let some iExpr := ctx.iExprsMap[e]? then
     return some iExpr
   for requested in ctx.iExprsArray do
-    if ← isDefEqWithoutAssignment e requested.expr then
+    if ← pureIsDefEq e requested.expr then
       return some requested
   return none
 
@@ -110,8 +109,7 @@ def addInclusionHypResult (result : InclusionHypResult) : HypothesisM Unit := do
 def mkHypInclusionFunction (e : Expr)
     (expected : IType) : HypothesisM ExprInclusionFunction := do
   let ctx ← read
-  toClosedExprInclusionFunction e expected (enabledParams := ctx.enabledParams)
-    (enabledFamilies := ctx.enabledFamilies)
+  toClosedExprInclusionFunction e expected ctx.enabledParams ctx.enabledFamilies
 
 /-- The generic hypothesis extension that uses a closed `ToSet` membership hypothesis directly as
 an inclusion hypothesis. -/

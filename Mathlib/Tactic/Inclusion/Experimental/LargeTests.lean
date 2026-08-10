@@ -15,7 +15,7 @@ namespace Inclusion.Large.Tests
 run_meta
   let two ← mkNumeral (mkConst ``Real) 2
   let e ← mkAppM ``Real.sqrt #[two]
-  let fn ← toExprInclusionFunction e (enabledFamilies := .ofList [`core, `real.dyadic])
+  let fn ← toExprInclusionFunction e (enabledFamilies := #[`core, `real.dyadic])
   unless fn.params.isEmpty do
     throwError "The inclusion function for `Real.sqrt 2` unexpectedly has parameters"
   unless fn.iExprs.isEmpty do

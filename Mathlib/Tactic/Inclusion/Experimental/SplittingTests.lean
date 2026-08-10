@@ -34,10 +34,9 @@ example {x : ℝ} (hx : x ∈ unitInterval) : x - x ≤ 1 / 8 := by
 
 run_meta
   withLocalDeclD `x (mkConst ``Real) fun x => do
-    let target ← mkAppM ``HSub.hSub #[x, x]
+    let goal ← mkAppM ``HSub.hSub #[x, x]
     let enabled := ({} : NameSet).insert `split
-    let fn ← toExprInclusionFunction target enabled
-      (enabledFamilies := .ofList [`core, `real.dyadic])
+    let fn ← toExprInclusionFunction goal enabled #[`core, `real.dyadic]
     let intervalType ← mkAppM ``Interval #[mkConst ``Dyadic]
     let compiledType ← mkArrow (mkConst ``Nat) (← mkArrow intervalType intervalType)
     let compiled ← unsafe evalExpr (ℕ → Interval Dyadic → Interval Dyadic)

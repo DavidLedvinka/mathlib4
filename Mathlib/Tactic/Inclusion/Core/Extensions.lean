@@ -21,8 +21,8 @@ open Lean Meta Elab Term DiscrTreeExt
 namespace Inclusion
 
 structure InclusionExt where
-  name : Name := by exact decl_name%
-  /-- The family used to enable and index this extension. -/
+  declName : Name := by exact decl_name%
+  userName : Name := by exact decl_name%
   family : Name
   derive (e : Expr) : InclusionM ExprInclusionBody
   priority : Nat := eval_prio default
@@ -30,8 +30,8 @@ structure InclusionExt where
 initialize inclusionExt : EnvExt InclusionExt ← initializeEnvExt ``InclusionExt
 
 structure HypothesisExt where
-  name : Name := by exact decl_name%
-  /-- The family used to enable and index this extension. -/
+  declName : Name := by exact decl_name%
+  userName : Name := by exact decl_name%
   family : Name
   derive (h type : Expr) : HypothesisM Unit
   priority : Nat := eval_prio default
@@ -50,7 +50,7 @@ initialize registerBuiltinAttribute {
       addDecl `inclusionExt inclusionExt ``InclusionExt declName
         (·.family) (es.getElems.map (·.raw)) kind
     | _ => throwUnsupportedSyntax
-  erase := eraseDecl inclusionExt (·.name) `inclusionExt
+  erase := fun _ => throwError "Inclusion extensions cannot be erased by declaration"
 }
 
 syntax (name := hypothesisExtAttr) "hypothesisExt" term,+ : attr
@@ -65,15 +65,14 @@ initialize registerBuiltinAttribute {
       addDecl `hypothesisExt hypothesisExt ``HypothesisExt declName
         (·.family) (es.getElems.map (·.raw)) kind
     | _ => throwUnsupportedSyntax
-  erase := eraseDecl hypothesisExt (·.name) `hypothesisExt
+  erase := fun _ => throwError "Hypothesis extensions cannot be erased by declaration"
 }
 
 section InclusionParam
 
 structure InclusionParamDecl where
   name : Name
-  enabledByDefault : Bool := false
-  defaultValue : Nat := 0
+  defaultValue : Option Nat := none
 
 structure InclusionParams where
   decls : NameMap InclusionParamDecl := {}

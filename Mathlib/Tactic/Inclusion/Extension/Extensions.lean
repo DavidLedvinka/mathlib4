@@ -2,6 +2,7 @@ module
 
 public import Mathlib.Tactic.Inclusion.Extension.Interval
 public import Mathlib.Tactic.Inclusion.Extension.Dyadic
+public meta import Mathlib.Tactic.Inclusion.Core.Elab
 public meta import Mathlib.Tactic.Inclusion.Core.ExtensionAPI
 public import Mathlib.Tactic.Inclusion.Extension.Splitter
 public import Mathlib.Algebra.Order.Field.Basic

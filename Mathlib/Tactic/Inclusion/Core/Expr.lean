@@ -96,6 +96,13 @@ def IType.synthUniv (iType : IType) : MetaM Expr := do
   try synthInstance type catch _ =>
     throwError "No `Univ` instance is registered for {iType.setType}"
 
+/-- Given an inclusion function `fn` for `goal`, expressions for its parameters and result, and a
+proof that the result is `IntervalBool.true`, create an expression proving `goal`. -/
+def ExprInclusionFunction.mkGoalProof (fn : ExprInclusionFunction) (goal : Expr)
+    (paramExprs : Array Expr) (inclusionExpr inclusionProof : Expr) : Expr :=
+  mkAppN (mkConst ``true_of_mem_intervalBool_eq_true)
+    #[goal, inclusionExpr, mkAppN fn.proof paramExprs, inclusionProof]
+
 /-- Introduce an array of `Nat` free variables for each param in `params` into the local context
 and pass the resulting array to `k`. -/
 def withInclusionParams {α : Type} [Inhabited α] (params : Array Name)
@@ -121,7 +128,5 @@ def mergeInclusionParams (paramArrays : Array (Array Name)) :
       indices := indices.push i
     argIndices := argIndices.push indices
   return (params, argIndices)
-
-
 
 end Inclusion

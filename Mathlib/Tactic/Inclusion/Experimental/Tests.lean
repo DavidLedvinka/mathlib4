@@ -38,7 +38,16 @@ theorem familyValue_mem : familyValue ∈ Inclusion.ofNat 1 := by
 
 @[inclusionExt familyValue]
 meta def evalFamilyValue : InclusionExt where
+  userName := `familyValue
   family := `test.family
+  derive e := do
+    unless e.isConstOf ``familyValue do failure
+    return ⟨← mkAppM ``Inclusion.ofNat #[mkNatLit 1], mkConst ``familyValue_mem⟩
+
+@[inclusionExt familyValue]
+meta def evalFamilyValueOther : InclusionExt where
+  userName := `familyValue
+  family := `test.other
   derive e := do
     unless e.isConstOf ``familyValue do failure
     return ⟨← mkAppM ``Inclusion.ofNat #[mkNatLit 1], mkConst ``familyValue_mem⟩
@@ -131,8 +140,7 @@ meta def evalTrue : InclusionExt where
 @[inclusionParam]
 meta def testParam : InclusionParamDecl where
   name := `testParam
-  enabledByDefault := true
-  defaultValue := 7
+  defaultValue := some 7
 
 def parameterizedTrue : Prop := True
 
@@ -209,9 +217,8 @@ example : True := by
 
 run_meta
   let enabled := ({} : NameSet).insert `testParam
-  let families : NameSet := .ofList [`core, `real.dyadic]
-  let fn ← toExprInclusionFunction (mkConst ``parameterizedTrue) enabled
-    (enabledFamilies := families)
+  let families := #[`core, `real.dyadic]
+  let fn ← toExprInclusionFunction (mkConst ``parameterizedTrue) enabled families
   let check ← compileInclusionCheck fn
   match check #[6], check #[7] with
   | .undetermined, .true => pure ()
@@ -223,11 +230,11 @@ run_meta
     let hypType ← mkAppM ``LE.le #[x, endpoint]
     withLocalDeclD `hx hypType fun _hx => do
       let one ← mkNumeral (mkConst ``Real) 1
-      let target ← mkAppM ``LE.le #[x, one]
+      let goal ← mkAppM ``LE.le #[x, one]
       let enabled := ({} : NameSet).insert `testParam
-      let families : NameSet := .ofList [`core, `real.dyadic]
-      let raw ← toExprInclusionFunction target enabled (enabledFamilies := families)
-      let closed ← raw.closeWithHyps (← mkHyps raw enabled (enabledFamilies := families))
+      let families := #[`core, `real.dyadic]
+      let raw ← toExprInclusionFunction goal enabled families
+      let closed ← raw.closeWithHyps (← mkHyps raw enabled families)
       let check ← compileInclusionCheck closed
       match check #[6], check #[7] with
       | .undetermined, .true => pure ()
@@ -236,10 +243,10 @@ run_meta
 run_meta
   withLocalDeclD `x (mkConst ``Real) fun x => do
     let one ← mkNumeral (mkConst ``Real) 1
-    let target ← mkAppM ``LE.le #[x, one]
-    let families : NameSet := .ofList [`core, `real.dyadic]
-    let raw ← toExprInclusionFunction target (enabledFamilies := families)
-    let closed ← raw.closeWithHyps (← mkHyps raw {} (enabledFamilies := families))
+    let goal ← mkAppM ``LE.le #[x, one]
+    let families := #[`core, `real.dyadic]
+    let raw ← toExprInclusionFunction goal (enabledFamilies := families)
+    let closed ← raw.closeWithHyps (← mkHyps raw {} families)
     unless closed.iExprs.isEmpty do
       throwError "Universal hypothesis preprocessing did not close all inclusion variables"
     let check ← compileInclusionCheck closed
@@ -256,6 +263,9 @@ example : familyValue + 1 ≤ 2 := by
 
 example : familyValue ≤ 1 := by
   inclusion +kernel [+test.family]
+
+example : familyValue ≤ 1 := by
+  inclusion [+test.other]
 
 example : True := by
   fail_if_success
@@ -404,14 +414,14 @@ example {x y : ℝ} (_hx : x ∈ unitInterval) (_hy : y ∈ zeroInterval) : True
 run_meta
   withLocalDeclD `x (mkConst ``Real) fun x => do
     let e ← mkAppM ``HAdd.hAdd #[x, x]
-    InclusionM.run (enabledFamilies := .ofList [`core, `real.dyadic]) do
+    InclusionM.run (enabledFamilies := #[`core, `real.dyadic]) do
       discard <| mkExprInclusionBody e
       unless (← get).iVars.size == 1 do
         throwError "Expected repeated expressions to share one inclusion variable"
 
 run_meta
   let succeeded ← try
-    discard <| InclusionM.run (enabledFamilies := .ofList [`core, `real.dyadic]) do
+    discard <| InclusionM.run (enabledFamilies := #[`core, `real.dyadic]) do
       withLocalDeclD `i (mkConst ``Nat) fun i => do
         let e ← mkAppM ``unregisteredIndexedValue #[i]
         mkExprInclusionBody e

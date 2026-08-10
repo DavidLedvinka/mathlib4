@@ -107,7 +107,7 @@ structure InclusionM.Context where
   /-- The names of the explicitly enabled inclusion parameters. -/
   enabledParams : NameSet
   /-- The names of the enabled inclusion-extension families. -/
-  enabledFamilies : NameSet
+  enabledFamilies : Array Name
 
 /-- The mutable state of the `InclusionM` monad. -/
 structure InclusionM.State where
@@ -127,7 +127,7 @@ instance : MonadBacktrack (Meta.SavedState × InclusionM.State) InclusionM where
 
 /-- Run the `InclusionM` monad in `MetaM`. -/
 def InclusionM.run {α : Type} (x : InclusionM α) (enabledParams : NameSet := {})
-    (enabledFamilies : NameSet := {}) : MetaM α := do
+    (enabledFamilies : Array Name := #[]) : MetaM α := do
   let localContext ← getLCtx
   let localInstances ← getLocalInstances
   StateT.run' (ReaderT.run x { localContext, localInstances, enabledParams, enabledFamilies }) {}
@@ -146,7 +146,7 @@ structure HypothesisM.Context where
   /-- The names of the explicitly enabled inclusion parameters. -/
   enabledParams : NameSet
   /-- The names of the enabled inclusion-extension families. -/
-  enabledFamilies : NameSet
+  enabledFamilies : Array Name
 
 /-- The mutable state of the `HypothesisM` monad. -/
 structure HypothesisM.State where
@@ -164,7 +164,7 @@ instance : MonadBacktrack (Meta.SavedState × HypothesisM.State) HypothesisM whe
 
 /-- Run the `HypothesisM` monad in `MetaM`. -/
 def HypothesisM.run {α : Type} (x : HypothesisM α) (iExprsArray : Array IExpr)
-    (enabledParams : NameSet) (enabledFamilies : NameSet := {}) : MetaM α := do
+    (enabledParams : NameSet) (enabledFamilies : Array Name := #[]) : MetaM α := do
   let iExprsMap := iExprsArray.foldl (fun iExprsMap iExpr => iExprsMap.insert iExpr.expr iExpr) {}
   StateT.run' (ReaderT.run x { iExprsMap, iExprsArray, enabledParams, enabledFamilies }) {}
 

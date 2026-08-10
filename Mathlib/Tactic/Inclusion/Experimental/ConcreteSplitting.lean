@@ -94,7 +94,7 @@ elab "inclusion_cover_core" : tactic => withMainContext do
   let goal ← getMainGoal
   let goal ← goal.change (← goal.getType).consumeMData (checkDefEq := false)
   replaceMainGoal [goal]
-  inclusionTactic { families := .ofList [`core, `real.dyadic, `real.concrete] }
+  inclusionTactic { families := #[`core, `real.dyadic, `real.concrete] }
 
 macro_rules
   | `(tactic| inclusion_cover $x in $source with $pieces using $cover) =>

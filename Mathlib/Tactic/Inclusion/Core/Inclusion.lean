@@ -29,18 +29,18 @@ def mkExprInclusionBody (e : Expr) : InclusionM ExprInclusionBody := do
     trace[Tactic.inclusion] "Reusing ivar for {e}"
     return iVar.toExprInclusionBody
   let savedState ← saveState
-  let inclusionExts := inclusionExt.getState (← getEnv)
-  let exts ← inclusionExts.getSortedMatch (← read).enabledFamilies e (·.priority)
-  for ext in exts do
-    if !inclusionExts.erased.contains ext.name then
-      try
-        let body ← ext.derive e
-        recordExtraModUseFromDecl (isMeta := true) ext.name
-        trace[Tactic.inclusion] "{ext.name} applied to {e}"
-        return body
-      catch err =>
-        trace[Tactic.inclusion] "Failed to apply {ext.name} to {e} : {err.toMessageData}"
-        restoreState savedState
+  let exts := inclusionExt.getState (← getEnv)
+  let matchedExts ← exts.getSortedMatch (← read).enabledFamilies e (·.priority)
+  for ext in matchedExts do
+    try
+      let body ← ext.derive e
+      recordExtraModUseFromDecl (isMeta := true) ext.declName
+      trace[Tactic.inclusion] "[{ext.family}] {ext.userName} applied to {e}"
+      return body
+    catch err =>
+      trace[Tactic.inclusion]
+        "Failed to apply [{ext.family}] {ext.userName} to {e} : {err.toMessageData}"
+      restoreState savedState
   throwError "No inclusion extension applies to {e}"
 
 /-- Apply the covers of `iVars` to an inclusion body. -/
@@ -59,7 +59,7 @@ private def mkCoveredExprInclusionBody (output : IExpr)
     let proofBody ← iVar.mkCoverMapProof output cover coarsen inclusion proof
     return { inclusionBody, proofBody }
 
-/-- Given an `ExprIncludionBody` for `e`, make its associated `ExprInclusionFunction`. -/
+/-- Given an `ExprInclusionBody` for `e`, make its associated `ExprInclusionFunction`. -/
 private def mkExprInclusionFunction (e : Expr) (body : ExprInclusionBody) :
     InclusionM ExprInclusionFunction := do
   let state ← get
@@ -81,8 +81,8 @@ private def mkExprInclusionFunction (e : Expr) (body : ExprInclusionBody) :
   return ⟨params, iExprs, output.iType, inclusion, proof⟩
 
 /-- Construct an `ExprInclusionFunction` for `e`. -/
-def toExprInclusionFunction (e : Expr) (enabledParams : NameSet := {})
-    (enabledFamilies : NameSet := {}) :
+def toExprInclusionFunction (e : Expr)
+    (enabledParams : NameSet := {}) (enabledFamilies : Array Name := #[]) :
     MetaM ExprInclusionFunction :=
   InclusionM.run (enabledParams := enabledParams) (enabledFamilies := enabledFamilies) do
     let body ← mkExprInclusionBody e

@@ -136,12 +136,10 @@ instance : Coarsen IntervalBool Prop where
   coarsen := IntervalBool.union
   mem_coarsen_left := by
     intro p s t hp
-    cases s <;> cases t <;>
-      simp_all [IntervalBool.union, ToSet.toSet, IntervalBool.toPropSet]
+    cases s <;> cases t <;> simp_all [IntervalBool.union, ToSet.toSet, IntervalBool.toPropSet]
   mem_coarsen_right := by
     intro p s t hp
-    cases s <;> cases t <;>
-      simp_all [IntervalBool.union, ToSet.toSet, IntervalBool.toPropSet]
+    cases s <;> cases t <;> simp_all [IntervalBool.union, ToSet.toSet, IntervalBool.toPropSet]
 
 end IntervalBool
 
