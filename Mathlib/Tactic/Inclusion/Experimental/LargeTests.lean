@@ -15,12 +15,12 @@ namespace Inclusion.Large.Tests
 run_meta
   let two ← mkNumeral (mkConst ``Real) 2
   let e ← mkAppM ``Real.sqrt #[two]
-  let fn ← toExprInclusionFunction e
+  let fn ← toExprInclusionFunction e (enabledFamilies := .ofList [`core, `real.dyadic])
   unless fn.params.isEmpty do
     throwError "The inclusion function for `Real.sqrt 2` unexpectedly has parameters"
-  unless fn.iexprs.isEmpty do
+  unless fn.iExprs.isEmpty do
     throwError "The inclusion function for `Real.sqrt 2` unexpectedly has inclusion variables: \
-      {fn.iexprs.map (·.expr)}"
+      {fn.iExprs.map (·.expr)}"
   if fn.inclusion.hasMVar || fn.proof.hasMVar then
     throwError "The inclusion function for `Real.sqrt 2` contains unabstracted metavariables"
   let some (outputExpr, outputSet, outputToSetInst) := toSetMem? (← inferType fn.proof)

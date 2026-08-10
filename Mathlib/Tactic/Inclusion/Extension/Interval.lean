@@ -41,6 +41,16 @@ def Interval.inter [LinearOrder α] (I J : Interval α) : Interval α :=
     | some a, some b => some (min a b)
   ⟨lb, ub⟩
 
+/-- The smallest interval whose endpoints contain both input intervals. -/
+def Interval.hull [LinearOrder α] (I J : Interval α) : Interval α :=
+  let lb := match I.lb, J.lb with
+    | ⊥, _ | _, ⊥ => ⊥
+    | some a, some b => some (min a b)
+  let ub := match I.ub, J.ub with
+    | ⊤, _ | _, ⊤ => ⊤
+    | some a, some b => some (max a b)
+  ⟨lb, ub⟩
+
 /-- Forget the lower endpoint of an interval. -/
 def Interval.downwardClosure (I : Interval α) : Interval α := ⟨⊥, I.ub⟩
 
@@ -83,6 +93,55 @@ instance [LinearOrder α] : Refine (Interval α) α where
       simp only [Interval.inter, hI, hJ]
       exact WithTop.coe_le_coe.mpr (le_min
         (WithTop.coe_le_coe.mp hs') (WithTop.coe_le_coe.mp ht'))
+
+theorem Interval.mem_hull_left [LinearOrder α] {x : α} {s t : Interval α} (hx : x ∈ s) :
+    x ∈ s.hull t := by
+  constructor
+  · rcases hs : s.lb with _ | sl
+    · simp [Interval.hull, hs]
+    rcases ht : t.lb with _ | tl
+    · simp [Interval.hull, hs, ht]
+    have hx' := hx.1
+    rw [hs] at hx'
+    simp only [Interval.hull, hs, ht]
+    exact WithBot.coe_le_coe.mpr <|
+      (min_le_left sl tl).trans (WithBot.coe_le_coe.mp hx')
+  · rcases hs : s.ub with _ | su
+    · simp [Interval.hull, hs]
+    rcases ht : t.ub with _ | tu
+    · simp [Interval.hull, hs, ht]
+    have hx' := hx.2
+    rw [hs] at hx'
+    simp only [Interval.hull, hs, ht]
+    exact WithTop.coe_le_coe.mpr <|
+      (WithTop.coe_le_coe.mp hx').trans (le_max_left su tu)
+
+theorem Interval.mem_hull_right [LinearOrder α] {x : α} {s t : Interval α} (hx : x ∈ t) :
+    x ∈ s.hull t := by
+  constructor
+  · rcases hs : s.lb with _ | sl
+    · simp [Interval.hull, hs]
+    rcases ht : t.lb with _ | tl
+    · simp [Interval.hull, hs, ht]
+    have hx' := hx.1
+    rw [ht] at hx'
+    simp only [Interval.hull, hs, ht]
+    exact WithBot.coe_le_coe.mpr <|
+      (min_le_right sl tl).trans (WithBot.coe_le_coe.mp hx')
+  · rcases hs : s.ub with _ | su
+    · simp [Interval.hull, hs]
+    rcases ht : t.ub with _ | tu
+    · simp [Interval.hull, hs, ht]
+    have hx' := hx.2
+    rw [ht] at hx'
+    simp only [Interval.hull, hs, ht]
+    exact WithTop.coe_le_coe.mpr <|
+      (WithTop.coe_le_coe.mp hx').trans (le_max_right su tu)
+
+instance [LinearOrder α] : Coarsen (Interval α) α where
+  coarsen := Interval.hull
+  mem_coarsen_left := Interval.mem_hull_left
+  mem_coarsen_right := Interval.mem_hull_right
 
 theorem Interval.mem_downwardClosure_of_le [Preorder α] {x y : α} {I : Interval α}
     (hxy : x ≤ y) (hy : y ∈ I) : x ∈ I.downwardClosure :=

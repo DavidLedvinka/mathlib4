@@ -10,9 +10,8 @@ public meta import Lean.Meta.Basic
 /-!
 # Datatypes for the `inclusion` tactic
 
-This file defines several datatypes (and some basic API) that are used throughout the core of the
-`inclusion` tactic.
-
+This file defines several datatypes and monads (and some basic API for them) that are used
+throughout the core of the `inclusion` tactic.
 -/
 
 public meta section
@@ -25,38 +24,43 @@ namespace Inclusion
 the type of `x` is `elemType`, the type of `s` is `setType` and the `ToSet setType elemType`
 instance used is `toSetInst`. -/
 structure IType where
-  /-- The element type of an inclusion expression -/
+  /-- The element type of an inclusion expression. -/
   elemType : Expr
   /-- The set type of an inclusion expression. -/
   setType : Expr
   /-- The `ToSet setType elemType` instance of an inclusion expression. -/
   toSetInst : Expr
+  deriving Inhabited
 
+/-- An `IExpr` is an expression `expr` together with a choice of `IType` used to represent
+inclusion expressions of the form `expr ∈ s`. -/
 structure IExpr where
-  iVarType : IType
+  /-- The types of an `IExpr`. -/
+  iType : IType
+  /-- The underlying expression of an `IExpr`. -/
   expr : Expr
+  deriving Inhabited
 
 /-- An `IVar` is a structure that holds the data of a "free inclusion variable" associated to an
-inclusion expression `iexpr`. This includes a pair of variables `setVar`, `hypVar` (which are
+inclusion expression `iExpr`. This includes a pair of variables `setVar`, `hypVar` (which are
 sometimes free variables but often synthetic opaque metavariables), where `setVar` is a variable for
-an inclusion set and `hypVar` is a (variable) proof of `iexpr.expr ∈ setVar`. -/
+an inclusion set and `hypVar` is a (variable) proof of `iExpr.expr ∈ setVar`. -/
 structure IVar where
   /-- The inclusion expression represented by the inclusion variable. -/
-  iexpr : IExpr
+  iExpr : IExpr
   /-- The inclusion set variable. -/
   setVar : Expr
-  /-- The variable `hypVar : iexpr.expr ∈ setVar`. -/
+  /-- The variable `hypVar : iExpr.expr ∈ setVar`. -/
   hypVar : Expr
-  /-- An expression of type `CoverCheck iVar.type.setType iVar.type.elemType`. This specifies how an
-  inclusion predicate of the `IVar` should be computationally checked (in particular whether it
-  should be checked on a cover to reduce the "dependency effect"). -/
-  coverCheck : Expr
+  /-- An optional expression of type `Cover iVar.type.setType iVar.type.elemType`. When present,
+  the inclusion function is mapped over this cover to reduce the "dependency effect". -/
+  cover : Option Expr
 
-/-- The `IType` of an `IVar` -/
-def IVar.type (iVar : IVar) : IType := iVar.iexpr.iVarType
+/-- The `IType` of an `IVar`. -/
+def IVar.type (iVar : IVar) : IType := iVar.iExpr.iType
 
 /-- The associated expression of an `IVar`. -/
-def IVar.expr (iVar : IVar) : Expr := iVar.iexpr.expr
+def IVar.expr (iVar : IVar) : Expr := iVar.iExpr.expr
 
 /-- An `ExprInclusionFunction` is a structure associated with an expression `e`, that specifies
 a function for computing the inclusion of `e` in some set and the proof that this computation
@@ -66,7 +70,7 @@ structure ExprInclusionFunction where
   params : Array Name
   /-- The array of inclusion expressions that are substituted for inclusion variables in the
   inclusion function. -/
-  iexprs : Array IExpr
+  iExprs : Array IExpr
   /-- The types of the inclusion result. -/
   outputType : IType
   /-- The expression of the inclusion function of type `ℕ → ... → ℕ → Iα₀ → ... → Iαₙ → Iβ`, with
@@ -74,9 +78,10 @@ structure ExprInclusionFunction where
   variable. -/
   inclusion : Expr
   /-- A proof of
-  `∀ n₀ ... nₖ s₀ ... sₘ, iexprs[0].expr ∈ s₀ → ... → iexprs[m].expr ∈ sₘ →`
+  `∀ n₀ ... nₖ s₀ ... sₘ, iExprs[0].expr ∈ s₀ → ... → iExprs[m].expr ∈ sₘ →`
   `e ∈ inclusion n₀ ... nₖ s₀ ... sₘ`, where `e` is the represented expression. -/
   proof : Expr
+  deriving Inhabited
 
 /-- An `ExprInclusionBody` is an intermediate structure used in the process of building the
 `ExprInclusionFunction` associated to an expression `e`. It contains an `inclusionBody` and
@@ -88,15 +93,81 @@ structure ExprInclusionBody where
   /-- The (possibly partially completed) proof of `e ∈ inclusionBody`. -/
   proofBody : Expr
 
-/-- Convert an `IVar` to an `ExprInclusionBody` -/
+/-- Convert an `IVar` to an `ExprInclusionBody`. -/
 def IVar.toExprInclusionBody (iVar : IVar) : ExprInclusionBody := ⟨iVar.setVar, iVar.hypVar⟩
 
-/-- An `InclusionParam` is a structure that holds the data of an adjustable `ℕ` typed
-inclusion parameter used by the `inclusion` tactic. -/
-structure InclusionParam where
-  /-- The name of the inclusion parameter. -/
-  name : Name
-  /-- The expression of the inclusion parameter. -/
-  exprVar : Expr
+section InclusionM
+
+/-- The fixed context of the `InclusionM` monad. -/
+structure InclusionM.Context where
+  /-- The initial `LocalContext`. -/
+  localContext : LocalContext
+  /-- The `LocalInstances` associated with `localContext`. -/
+  localInstances : LocalInstances
+  /-- The names of the explicitly enabled inclusion parameters. -/
+  enabledParams : NameSet
+  /-- The names of the enabled inclusion-extension families. -/
+  enabledFamilies : NameSet
+
+/-- The mutable state of the `InclusionM` monad. -/
+structure InclusionM.State where
+  /-- The inclusion variables registered for expressions encountered during construction. -/
+  iVars : ExprMap IVar := {}
+  /-- The inclusion parameter variables used during construction, indexed by name. -/
+  usedParams : NameMap Expr := {}
+
+/-- The monad used by the `inclusion` tactic during the construction of `ExprInclusionFunction`s. -/
+abbrev InclusionM := ReaderT InclusionM.Context <| StateT InclusionM.State MetaM
+
+instance : MonadBacktrack (Meta.SavedState × InclusionM.State) InclusionM where
+  saveState := do return ⟨← Meta.saveState, ← get⟩
+  restoreState s := do
+    s.1.restore
+    set s.2
+
+/-- Run the `InclusionM` monad in `MetaM`. -/
+def InclusionM.run {α : Type} (x : InclusionM α) (enabledParams : NameSet := {})
+    (enabledFamilies : NameSet := {}) : MetaM α := do
+  let localContext ← getLCtx
+  let localInstances ← getLocalInstances
+  StateT.run' (ReaderT.run x { localContext, localInstances, enabledParams, enabledFamilies }) {}
+
+end InclusionM
+
+section HypothesisM
+
+/-- The fixed context of the `HypothesisM` monad. -/
+structure HypothesisM.Context where
+  /-- The requested inclusion expressions, stored as an `ExprMap` from the expressions to their
+  `IExpr`s. -/
+  iExprsMap : ExprMap IExpr
+  /-- The requested inclusion expressions, stored as an `Array` of `IExpr`s. -/
+  iExprsArray : Array IExpr
+  /-- The names of the explicitly enabled inclusion parameters. -/
+  enabledParams : NameSet
+  /-- The names of the enabled inclusion-extension families. -/
+  enabledFamilies : NameSet
+
+/-- The mutable state of the `HypothesisM` monad. -/
+structure HypothesisM.State where
+  /-- The candidate inclusion functions derived for each requested expression. -/
+  inclusions : ExprMap (Array ExprInclusionFunction) := {}
+
+/-- The monad used by the `inclusion` tactic to construct initial inclusion hypotheses. -/
+abbrev HypothesisM := ReaderT HypothesisM.Context <| StateT HypothesisM.State MetaM
+
+instance : MonadBacktrack (Meta.SavedState × HypothesisM.State) HypothesisM where
+  saveState := do return ⟨← Meta.saveState, ← get⟩
+  restoreState s := do
+    s.1.restore
+    set s.2
+
+/-- Run the `HypothesisM` monad in `MetaM`. -/
+def HypothesisM.run {α : Type} (x : HypothesisM α) (iExprsArray : Array IExpr)
+    (enabledParams : NameSet) (enabledFamilies : NameSet := {}) : MetaM α := do
+  let iExprsMap := iExprsArray.foldl (fun iExprsMap iExpr => iExprsMap.insert iExpr.expr iExpr) {}
+  StateT.run' (ReaderT.run x { iExprsMap, iExprsArray, enabledParams, enabledFamilies }) {}
+
+end HypothesisM
 
 end Inclusion

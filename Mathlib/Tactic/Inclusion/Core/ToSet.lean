@@ -10,7 +10,7 @@ public import Mathlib.Data.Set.Insert
 /-!
 # Definition of `ToSet` and basic API
 
-This file defines the `ToSet` class and it's API needed for the `inclusion` tactic.
+This file defines the `ToSet` class and its API needed for the `inclusion` tactic.
 
 -/
 
@@ -30,7 +30,7 @@ instance {Iα α : Type*} [ToSet Iα α] : CoeTC Iα (Set α) where
   coe := ToSet.toSet
 
 instance {Iα α : Type*} [ToSet Iα α] : Membership α Iα where
-  mem s a := a ∈ (s : Set α)
+  mem s a := ToSet.toSet s a
 
 @[simp]
 lemma mem_set_iff_mem_toSet {Iα α : Type*} [ToSet Iα α] (a : α) (s : Iα) :
@@ -51,14 +51,42 @@ class Univ (Iα α : Type*) [ToSet Iα α] where
   /-- Every element of `α` belongs to `univ`. -/
   mem_univ (x : α) : x ∈ univ
 
-/-- A `Refine Iα α` instance is a specification of a function `refine : Iα → Iα → Iα` such that
-for any `s t : Iα`, `s ∩ t ⊆ refine s t` as sets of `α`. This is useful for merging multiple
-inclusion hypotheses of a single inclusion variable. -/
+/-- A `Refine Iα α` instance is a specification of a (computable) function `refine : Iα → Iα → Iα`
+such that for any `s t : Iα`, `s ∩ t ⊆ refine s t` as sets of `α`. This is useful for merging
+multiple inclusion hypotheses of a single inclusion variable. -/
 class Refine (Iα α : Type*) [ToSet Iα α] where
   /-- A (computable) function to refine two inclusion hypotheses. -/
   refine : Iα → Iα → Iα
   /-- If `x ∈ s` and `x ∈ t` then `x ∈ refine s t`. -/
   mem_refine {x : α} {s t : Iα} (hs : x ∈ s) (ht : x ∈ t) : x ∈ refine s t
+
+/-- A `Coarsen Iα α` instance is a specification of a (computable) function `coarsen : Iα → Iα → Iα`
+such that for any `s t : Iα`, `s ∪ t ⊆ coarsen s t`. This is useful for applying an inclusion
+function to a cover of the input and then merging the results. -/
+class Coarsen (Iα α : Type*) [ToSet Iα α] where
+  /-- A represented set containing both input sets. -/
+  coarsen : Iα → Iα → Iα
+  /-- If `x ∈ s` then `x ∈ coarsen s t`. -/
+  mem_coarsen_left {x : α} {s t : Iα} (hx : x ∈ s) : x ∈ coarsen s t
+  /-- If `x ∈ t` then `x ∈ coarsen s t`. -/
+  mem_coarsen_right {x : α} {s t : Iα} (hx : x ∈ t) : x ∈ coarsen s t
+
+universe u
+
+/-- A `Cover Iα α` specifies a function `coverMap` to compute a "refined" inclusion of `F s`
+for `s : Iα` and an inclusion function `F : Iα → Iβ`, by computing `F` on each element of a
+cover of `s` and then using `coarsen` to merge the results. Schematically
+
+`coverMap s F = fold coarsen (map F (cover s))`
+
+where `cover : Iα → Array Iα` would specify the underlying cover, but the `coverMap` formulation
+allows this function to be implemented more efficiently for kernel reduction. -/
+structure Cover (Iα α : Type*) [ToSet Iα α] where
+  /-- Compute an inclusion for `F s` using a cover of `s`. -/
+  coverMap {Iβ β : Type u} [ToSet Iβ β] [Coarsen Iβ β] (s : Iα) (F : Iα → Iβ) : Iβ
+  /-- If `x ∈ s` and `∀ t, x ∈ t → y ∈ F t` then `y ∈ coverMap s F`. -/
+  mem_coverMap {Iβ β : Type u} [ToSet Iβ β] [Coarsen Iβ β] {s : Iα} {F : Iα → Iβ} {x : α} {y : β}
+    (hx : x ∈ s) (hy : ∀ t, x ∈ t → y ∈ F t) : y ∈ coverMap s F
 
 open ToSet
 
@@ -89,26 +117,31 @@ theorem true_of_mem_intervalBool_eq_true {p : Prop} {b : IntervalBool} (hp : p �
     (hb : b = IntervalBool.true) : p :=
   true_of_mem_intervalBool_true (hb ▸ hp)
 
-section CoverCheck
+/-- Return `true` when `IntervalBool = true` otherwise return `false`. -/
+def IntervalBool.isTrue : IntervalBool → Bool
+  | .true => Bool.true
+  | .false | .undetermined => Bool.false
 
-/-- A `CoverCheck Iα α` specifies a way to check whether an inclusion predicate
-`P : Iα → IntervalBool` is true on a family of represented sets covering a given `s : Iα`.
-This is used to split the inclusion set of an inclusion variable, allowing the predicate to be
-checked separately on smaller sets to reduce the dependency effect. -/
-structure CoverCheck (Iα α : Type*) [ToSet Iα α] where
-  /-- Check whether `P` succeeds on a family of represented sets covering `s`. -/
-  check (s : Iα) (P : Iα → IntervalBool) : IntervalBool
-  /-- If `P` contains `p` on every represented set containing `x`, then `check s P` contains `p`
-  whenever `x ∈ s`. -/
-  mem_check (s : Iα) (P : Iα → IntervalBool) {p : Prop} {x : α}
-    (hx : x ∈ s) (hp : ∀ t, x ∈ t → p ∈ P t) : p ∈ check s P
+theorem IntervalBool.eq_true_of_isTrue_eq_true {b : IntervalBool}
+    (h : b.isTrue = Bool.true) : b = .true := by
+  cases b <;> simp_all [IntervalBool.isTrue]
 
-/-- The cover check that checks an inclusion predicate directly on the supplied set. -/
-def CoverCheck.self {Iα α : Type*} [ToSet Iα α] : CoverCheck Iα α where
-  check s P := P s
-  mem_check := fun s _ _ _ hx hp ↦ hp s hx
+/-- Union of two `IntervalBool`s. -/
+def IntervalBool.union : IntervalBool → IntervalBool → IntervalBool
+  | .true, .true => .true
+  | .false, .false => .false
+  | _, _ => .undetermined
 
-end CoverCheck
+instance : Coarsen IntervalBool Prop where
+  coarsen := IntervalBool.union
+  mem_coarsen_left := by
+    intro p s t hp
+    cases s <;> cases t <;>
+      simp_all [IntervalBool.union, ToSet.toSet, IntervalBool.toPropSet]
+  mem_coarsen_right := by
+    intro p s t hp
+    cases s <;> cases t <;>
+      simp_all [IntervalBool.union, ToSet.toSet, IntervalBool.toPropSet]
 
 end IntervalBool
 

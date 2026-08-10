@@ -26,9 +26,37 @@ theorem metaValue_mem : metaValue ∈ Inclusion.ofNat 1 := by
 
 @[inclusionExt metaValue]
 meta def evalMetaValue : InclusionExt where
-  eval e := do
+  family := `real.dyadic
+  derive e := do
     unless e.isConstOf ``metaValue do failure
     return ⟨← mkAppM ``Inclusion.ofNat #[mkNatLit 1], mkConst ``metaValue_mem⟩
+
+def familyValue : ℝ := 1
+
+theorem familyValue_mem : familyValue ∈ Inclusion.ofNat 1 := by
+  simpa [familyValue] using Inclusion.ofNat_mem 1
+
+@[inclusionExt familyValue]
+meta def evalFamilyValue : InclusionExt where
+  family := `test.family
+  derive e := do
+    unless e.isConstOf ``familyValue do failure
+    return ⟨← mkAppM ``Inclusion.ofNat #[mkNatLit 1], mkConst ``familyValue_mem⟩
+
+inductive FamilyUpperBound (x : ℝ) : Prop where
+  | intro (h : x ≤ 1)
+
+theorem FamilyUpperBound.le {x : ℝ} (h : FamilyUpperBound x) : x ≤ 1 := by
+  cases h with
+  | intro h => exact h
+
+@[hypothesisExt FamilyUpperBound _]
+meta def evalFamilyUpperBound : HypothesisExt where
+  family := `test.hypothesis
+  derive h type := do
+    let (``FamilyUpperBound, #[_]) := type.getAppFnArgs | failure
+    let hle ← mkAppM ``FamilyUpperBound.le #[h]
+    deriveRealOrderHyp hle (← inferType hle)
 
 theorem natCast_mem (n : ℕ) : (n : ℝ) ∈ Inclusion.ofNat n := by
   constructor
@@ -46,7 +74,8 @@ def unregisteredIndexedValue (i : ℕ) : ℝ := i
 
 @[inclusionExt indexedValue _]
 meta def evalIndexedValue : InclusionExt where
-  eval e := do
+  family := `real.dyadic
+  derive e := do
     let (``indexedValue, #[i]) := e.getAppFnArgs | failure
     return ⟨← mkAppM ``Inclusion.ofNat #[i], ← mkAppM ``indexedValue_mem #[i]⟩
 
@@ -64,7 +93,8 @@ theorem natPow_mem {r : ℝ} {x : Interval Dyadic} (h : r ∈ x) (n : ℕ) :
 
 @[inclusionExt _ ^ _]
 meta def evalNatPow : InclusionExt where
-  eval e := do
+  family := `real.dyadic
+  derive e := do
     let (``HPow.hPow, #[α, β, γ, _, x, n]) := e.getAppFnArgs | failure
     unless ← isDefEq α (mkConst ``Real) do failure
     unless ← isDefEq β (mkConst ``Nat) do failure
@@ -75,7 +105,8 @@ meta def evalNatPow : InclusionExt where
 
 @[inclusionExt Finset.sum (Finset.range _) _]
 meta def evalRangeSum : InclusionExt where
-  eval e := do
+  family := `real.dyadic
+  derive e := do
     let (``Finset.sum, #[α, β, _, s, f]) := e.getAppFnArgs | failure
     unless ← isDefEq α (mkConst ``Nat) do failure
     unless ← isDefEq β (mkConst ``Real) do failure
@@ -92,7 +123,8 @@ theorem true_mem : True ∈ IntervalBool.true := Inclusion.mem_intervalBool_true
 
 @[inclusionExt True]
 meta def evalTrue : InclusionExt where
-  eval e := do
+  family := `real.dyadic
+  derive e := do
     unless e.isConstOf ``True do failure
     return ⟨mkConst ``IntervalBool.true, mkConst ``true_mem⟩
 
@@ -115,35 +147,47 @@ theorem parameterizedTrue_mem (n : Nat) : parameterizedTrue ∈ parameterizedTru
 
 @[inclusionExt parameterizedTrue]
 meta def evalParameterizedTrue : InclusionExt where
-  eval e := do
+  family := `real.dyadic
+  derive e := do
     unless e.isConstOf ``parameterizedTrue do failure
     let some n ← getParam? `testParam | failure
     return ⟨← mkAppM ``parameterizedTrueCheck #[n], ← mkAppM ``parameterizedTrue_mem #[n]⟩
 
-def parameterizedBound : ℝ := 1
+def parameterizedEndpoint : ℝ := 1
 
-def parameterizedBoundInterval (n : Nat) : Interval Dyadic :=
+def parameterizedEndpointInterval (n : Nat) : Interval Dyadic :=
   if n = 7 then Inclusion.ofNat 1 else Interval.univ Dyadic
 
-theorem parameterizedBound_mem (n : Nat) : parameterizedBound ∈ parameterizedBoundInterval n := by
-  simp only [parameterizedBoundInterval]
+theorem parameterizedEndpoint_mem (n : Nat) :
+    parameterizedEndpoint ∈ parameterizedEndpointInterval n := by
+  simp only [parameterizedEndpointInterval]
   split
-  · simpa [parameterizedBound] using Inclusion.ofNat_mem 1
+  · simpa [parameterizedEndpoint] using Inclusion.ofNat_mem 1
   · exact Inclusion.mem_univ _
 
-@[inclusionExt parameterizedBound]
-meta def evalParameterizedBound : InclusionExt where
-  eval e := do
-    unless e.isConstOf ``parameterizedBound do failure
+@[inclusionExt parameterizedEndpoint]
+meta def evalParameterizedEndpoint : InclusionExt where
+  family := `real.dyadic
+  derive e := do
+    unless e.isConstOf ``parameterizedEndpoint do failure
     let some n ← getParam? `testParam | failure
-    return ⟨← mkAppM ``parameterizedBoundInterval #[n],
-      ← mkAppM ``parameterizedBound_mem #[n]⟩
+    return ⟨← mkAppM ``parameterizedEndpointInterval #[n],
+      ← mkAppM ``parameterizedEndpoint_mem #[n]⟩
 
 example : True := by
   inclusion
 
+example : True := by
+  inclusion +kernel
+
+example : True := by
+  inclusion (kernel := true)
+
 example : parameterizedTrue := by
   inclusion
+
+example : parameterizedTrue := by
+  inclusion +kernel [testParam := 7]
 
 example : True := by
   fail_if_success
@@ -151,9 +195,23 @@ example : True := by
       inclusion [testParam := 6]
   trivial
 
+example : True := by
+  fail_if_success
+    have : parameterizedTrue := by
+      inclusion +kernel [testParam := 6]
+  trivial
+
+example : True := by
+  fail_if_success
+    have : parameterizedTrue := by
+      inclusion +kernel +native
+  trivial
+
 run_meta
   let enabled := ({} : NameSet).insert `testParam
-  let fn ← toCoveredExprInclusionFunction (mkConst ``parameterizedTrue) enabled
+  let families : NameSet := .ofList [`core, `real.dyadic]
+  let fn ← toExprInclusionFunction (mkConst ``parameterizedTrue) enabled
+    (enabledFamilies := families)
   let check ← compileInclusionCheck fn
   match check #[6], check #[7] with
   | .undetermined, .true => pure ()
@@ -161,34 +219,67 @@ run_meta
 
 run_meta
   withLocalDeclD `x (mkConst ``Real) fun x => do
-    let bound := mkConst ``parameterizedBound
-    let hypType ← mkAppM ``LE.le #[x, bound]
+    let endpoint := mkConst ``parameterizedEndpoint
+    let hypType ← mkAppM ``LE.le #[x, endpoint]
     withLocalDeclD `hx hypType fun _hx => do
       let one ← mkNumeral (mkConst ``Real) 1
       let target ← mkAppM ``LE.le #[x, one]
       let enabled := ({} : NameSet).insert `testParam
-      let raw ← toCoveredExprInclusionFunction target enabled
-      let closed ← raw.closeWithBounds (← mkInclusionHypBounds raw enabled)
+      let families : NameSet := .ofList [`core, `real.dyadic]
+      let raw ← toExprInclusionFunction target enabled (enabledFamilies := families)
+      let closed ← raw.closeWithHyps (← mkHyps raw enabled (enabledFamilies := families))
       let check ← compileInclusionCheck closed
       match check #[6], check #[7] with
       | .undetermined, .true => pure ()
-      | _, _ => throwError "Hypothesis-bound parameters cannot be varied without recompilation"
+      | _, _ => throwError "Hypothesis parameters cannot be varied without recompilation"
 
 run_meta
   withLocalDeclD `x (mkConst ``Real) fun x => do
     let one ← mkNumeral (mkConst ``Real) 1
     let target ← mkAppM ``LE.le #[x, one]
-    let raw ← toCoveredExprInclusionFunction target
-    let closed ← raw.closeWithBounds (← mkInclusionHypBounds raw {})
-    unless closed.iexprs.isEmpty do
+    let families : NameSet := .ofList [`core, `real.dyadic]
+    let raw ← toExprInclusionFunction target (enabledFamilies := families)
+    let closed ← raw.closeWithHyps (← mkHyps raw {} (enabledFamilies := families))
+    unless closed.iExprs.isEmpty do
       throwError "Universal hypothesis preprocessing did not close all inclusion variables"
     let check ← compileInclusionCheck closed
     match check #[] with
     | .undetermined => pure ()
-    | _ => throwError "An unbounded inclusion variable unexpectedly verified the test inequality"
+    | _ => throwError "An inclusion variable without a hypothesis unexpectedly verified the test \
+      inequality"
 
 example : metaValue ≤ 2 := by
   inclusion
+
+example : familyValue + 1 ≤ 2 := by
+  inclusion [+test.family]
+
+example : familyValue ≤ 1 := by
+  inclusion +kernel [+test.family]
+
+example : True := by
+  fail_if_success
+    have : familyValue ≤ 1 := by
+      inclusion
+  trivial
+
+example {x : ℝ} (hx : x ≤ familyValue) : x ≤ 1 := by
+  inclusion [+test.family]
+
+example {x : ℝ} (hx : FamilyUpperBound x) : x ≤ 1 := by
+  inclusion [+test.hypothesis]
+
+example {x : ℝ} (_hx : FamilyUpperBound x) : True := by
+  fail_if_success
+    have : x ≤ 1 := by
+      inclusion
+  trivial
+
+example : True := by
+  fail_if_success
+    have : familyValue ≤ 1 := by
+      inclusion [+test.unknown]
+  trivial
 
 example : ∑ i ∈ Finset.range 3, indexedValue i + 1 ≤ 6 := by
   inclusion
@@ -258,11 +349,14 @@ example {x : ℝ} (hx : x ∈ Set.Icc 1 2) : x + x ≤ 4 := by
 example {x : ℝ} (hx : x ∈ Set.Ioo 1 2) : x + x ≤ 4 := by
   inclusion
 
-example {x : ℝ} (hx : x ≤ parameterizedBound) : x ≤ 1 := by
+example {x : ℝ} (hx : x ≤ parameterizedEndpoint) : x ≤ 1 := by
   inclusion
 
 example {x : ℝ} (hx : x ∈ unitInterval) : x + x ≤ 4 := by
   inclusion
+
+example {x : ℝ} (hx : x ∈ unitInterval) : x + x ≤ 4 := by
+  inclusion +kernel
 
 example {x y : ℝ} (hx : x ∈ unitInterval) (hy : y ∈ positiveInterval) : x - y ≤ -1 := by
   inclusion
@@ -310,14 +404,14 @@ example {x y : ℝ} (_hx : x ∈ unitInterval) (_hy : y ∈ zeroInterval) : True
 run_meta
   withLocalDeclD `x (mkConst ``Real) fun x => do
     let e ← mkAppM ``HAdd.hAdd #[x, x]
-    InclusionM.run do
+    InclusionM.run (enabledFamilies := .ofList [`core, `real.dyadic]) do
       discard <| mkExprInclusionBody e
-      unless (← get).ivars.size == 1 do
+      unless (← get).iVars.size == 1 do
         throwError "Expected repeated expressions to share one inclusion variable"
 
 run_meta
   let succeeded ← try
-    discard <| InclusionM.run do
+    discard <| InclusionM.run (enabledFamilies := .ofList [`core, `real.dyadic]) do
       withLocalDeclD `i (mkConst ``Nat) fun i => do
         let e ← mkAppM ``unregisteredIndexedValue #[i]
         mkExprInclusionBody e

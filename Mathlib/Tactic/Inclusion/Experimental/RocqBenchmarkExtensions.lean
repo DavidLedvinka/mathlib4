@@ -155,7 +155,8 @@ theorem cos_mem {r : ℝ} {x : Interval Dyadic} (prec : ℕ) (hrx : r ∈ x) :
 
 @[inclusionExt Real.sin _]
 meta def evalSin : InclusionExt where
-  eval e := do
+  family := `real.dyadic
+  derive e := do
     let body ← mkExprInclusionBody (← realUnaryArg e)
     let prec ← Large.precisionExpr
     return ⟨← mkAppM ``sin #[prec, body.inclusionBody],
@@ -163,7 +164,8 @@ meta def evalSin : InclusionExt where
 
 @[inclusionExt Real.cos _]
 meta def evalCos : InclusionExt where
-  eval e := do
+  family := `real.dyadic
+  derive e := do
     let body ← mkExprInclusionBody (← realUnaryArg e)
     let prec ← Large.precisionExpr
     return ⟨← mkAppM ``cos #[prec, body.inclusionBody],

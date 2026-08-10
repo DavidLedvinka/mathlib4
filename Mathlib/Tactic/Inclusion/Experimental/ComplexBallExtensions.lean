@@ -192,7 +192,8 @@ meta def evalComplexBinary (e : Expr) (op inclusion : Name) : InclusionM ExprInc
 
 @[inclusionExt OfNat.ofNat _]
 meta def evalOfNat : InclusionExt where
-  eval e := do
+  family := `complex.ball
+  derive e := do
     let (``OfNat.ofNat, #[α, n, _]) := e.getAppFnArgs | failure
     unless ← isDefEq α (mkConst ``Complex) do failure
     guard n.isRawNatLit
@@ -200,33 +201,40 @@ meta def evalOfNat : InclusionExt where
 
 @[inclusionExt Complex.I]
 meta def evalI : InclusionExt where
-  eval e := do
+  family := `complex.ball
+  derive e := do
     unless e.isConstOf ``Complex.I do failure
     return ⟨mkConst ``Ball.I, mkConst ``I_mem⟩
 
 @[inclusionExt Neg.neg _]
 meta def evalNeg : InclusionExt where
-  eval e := evalComplexUnary e ``Ball.neg ``neg_mem
+  family := `complex.ball
+  derive e := evalComplexUnary e ``Ball.neg ``neg_mem
 
 @[inclusionExt(_ : ℂ) + (_ : ℂ)]
 meta def evalAdd : InclusionExt where
-  eval e := evalComplexBinary e ``Ball.add ``add_mem
+  family := `complex.ball
+  derive e := evalComplexBinary e ``Ball.add ``add_mem
 
 @[inclusionExt(_ : ℂ) - (_ : ℂ)]
 meta def evalSub : InclusionExt where
-  eval e := evalComplexBinary e ``Ball.sub ``sub_mem
+  family := `complex.ball
+  derive e := evalComplexBinary e ``Ball.sub ``sub_mem
 
 @[inclusionExt(_ : ℂ) * (_ : ℂ)]
 meta def evalMul : InclusionExt where
-  eval e := evalComplexBinary e ``Ball.mul ``mul_mem
+  family := `complex.ball
+  derive e := evalComplexBinary e ``Ball.mul ``mul_mem
 
 @[inclusionExt(_ : ℂ) / (_ : ℂ)]
 meta def evalDiv : InclusionExt where
-  eval e := evalComplexBinary e ``Ball.div ``div_mem
+  family := `complex.ball
+  derive e := evalComplexBinary e ``Ball.div ``div_mem
 
 @[inclusionExt‖(_ : ℂ)‖]
 meta def evalAbs : InclusionExt where
-  eval e := do
+  family := `complex.ball
+  derive e := do
     let .app _ z ← whnfR e | failure
     unless ← isDefEq (← inferType z) (mkConst ``Complex) do failure
     unless ← isDefEq (← inferType e) (mkConst ``Real) do failure
@@ -236,13 +244,13 @@ meta def evalAbs : InclusionExt where
 
 @[inclusionExt(_ : ℂ)]
 meta def evalIVar : InclusionExt where
+  family := `complex.ball
   priority := eval_prio high
-  eval e := do
+  derive e := do
     unless ← isDefEq (← inferType e) (mkConst ``Complex) do failure
     let setType := mkConst ``Ball
     let toSetInst ← synthInstance (← mkAppM ``ToSet #[setType, mkConst ``Complex])
-    let coverCheck ← mkAppOptM ``CoverCheck.self #[setType, mkConst ``Complex, toSetInst]
-    let iVar ← mkIVar e setType toSetInst coverCheck
+    let iVar ← mkIVar e setType toSetInst
     return iVar.toExprInclusionBody
 
 meta def closedBallArgs? (type : Expr) : MetaM (Option (Expr × Expr × Expr)) := do
@@ -251,32 +259,33 @@ meta def closedBallArgs? (type : Expr) : MetaM (Option (Expr × Expr × Expr)) :
   if args.size < 2 then return none
   return some (z, args[args.size - 2]!, args[args.size - 1]!)
 
-meta def deriveClosedBallHyp (h : Expr) : InclusionHypM (Array InclusionHypResult) := do
-  let some (z, center, radius) ← closedBallArgs? (← inferType h) | failure
-  let some { expr, iVarType } ← requestedIVar? z | return #[]
-  let centerFn ← mkHypInclusionFunction center iVarType
+meta def deriveClosedBallHyp (h type : Expr) : HypothesisM Unit := do
+  let some (z, center, radius) ← closedBallArgs? type | failure
+  let some { expr, iType } ← requestedIVar? z | return
+  let centerFn ← mkHypInclusionFunction center iType
   let radiusSetType ← mkAppM ``Interval #[mkConst ``Dyadic]
   let radiusToSet ← synthInstance
     (← mkAppM ``ToSet #[radiusSetType, mkConst ``Real])
   let radiusType : IType := ⟨mkConst ``Real, radiusSetType, radiusToSet⟩
   let radiusFn ← mkHypInclusionFunction radius radiusType
-  let params := mergeInclusionParams centerFn.params radiusFn.params
-  let bound ← withInclusionParams params fun paramVars => do
-    let centerArgs ← inclusionParamArgs params paramVars centerFn.params
-    let radiusArgs ← inclusionParamArgs params paramVars radiusFn.params
+  let (params, argIndices) :=
+    mergeInclusionParams #[centerFn.params, radiusFn.params]
+  let hyp ← withInclusionParams params fun paramVars => do
+    let centerArgs := argIndices[0]!.map fun i => paramVars[i]!
+    let radiusArgs := argIndices[1]!.map fun i => paramVars[i]!
     let centerSet := (mkAppN centerFn.inclusion centerArgs).headBeta
     let centerProof := (mkAppN centerFn.proof centerArgs).headBeta
     let radiusSet := (mkAppN radiusFn.inclusion radiusArgs).headBeta
     let radiusProof := (mkAppN radiusFn.proof radiusArgs).headBeta
     let set ← mkAppM ``closedBallHull #[centerSet, radiusSet]
     let proof ← mkAppM ``closedBallHull_mem #[centerProof, radiusProof, h]
-    return ⟨params, #[], iVarType,
-      ← mkLambdaFVars paramVars set (binderInfoForMVars := .default),
-      ← mkLambdaFVars paramVars proof (binderInfoForMVars := .default)⟩
-  return #[⟨expr, bound⟩]
+    return ⟨params, #[], iType,
+      ← mkLambdaFVars paramVars set, ← mkLambdaFVars paramVars proof⟩
+  addInclusionHypResult ⟨expr, hyp⟩
 
-@[inclusionHypRule(_ : ℂ) ∈ Metric.closedBall _ _]
-meta def evalClosedBallHyp : InclusionHypRule where
+@[hypothesisExt(_ : ℂ) ∈ Metric.closedBall _ _]
+meta def evalClosedBallHyp : HypothesisExt where
+  family := `complex.ball
   derive := deriveClosedBallHyp
 
 end Inclusion.ComplexBall

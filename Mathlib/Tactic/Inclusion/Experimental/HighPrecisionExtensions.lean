@@ -127,8 +127,9 @@ theorem gaussianIntegral_mem (prec : ℕ) :
 
 @[inclusionExt _ / _]
 meta def evalDiv : InclusionExt where
+  family := `real.dyadic
   priority := 0
-  eval e := do
+  derive e := do
     let (a, b) ← Inclusion.realBinaryArgs e
     let left ← mkExprInclusionBody a
     let right ← mkExprInclusionBody b
@@ -138,8 +139,9 @@ meta def evalDiv : InclusionExt where
 
 @[inclusionExt _ ^ (_ : ℤ)]
 meta def evalZPow : InclusionExt where
+  family := `real.dyadic
   priority := 0
-  eval e := do
+  derive e := do
     let (``HPow.hPow, #[α, β, γ, _, x, n]) := e.getAppFnArgs | failure
     unless ← isDefEq α (mkConst ``Real) do failure
     unless ← isDefEq β (mkConst ``Int) do failure
@@ -151,14 +153,16 @@ meta def evalZPow : InclusionExt where
 
 @[inclusionExt|(_ : ℝ)|]
 meta def evalAbs : InclusionExt where
-  eval e := do
+  family := `real.dyadic
+  derive e := do
     let body ← mkExprInclusionBody (← Inclusion.realUnaryArg e)
     return ⟨← mkAppM ``absInterval #[body.inclusionBody],
       ← mkAppM ``abs_mem #[body.proofBody]⟩
 
 @[inclusionExt ramanujanSummand _]
 meta def evalRamanujanSummand : InclusionExt where
-  eval e := do
+  family := `real.dyadic
+  derive e := do
     let (``ramanujanSummand, #[k]) := e.getAppFnArgs | failure
     let prec ← Large.precisionExpr
     return ⟨← mkAppM ``ramanujanSummandInterval #[prec, k],
@@ -166,15 +170,17 @@ meta def evalRamanujanSummand : InclusionExt where
 
 @[inclusionExt Nat.cast _]
 meta def evalNatCast : InclusionExt where
+  family := `real.dyadic
   priority := 0
-  eval e := do
+  derive e := do
     let (``Nat.cast, #[α, _, n]) := e.getAppFnArgs | failure
     unless ← isDefEq α (mkConst ``Real) do failure
     return ⟨← mkAppM ``Large.ofNat #[n], ← mkAppM ``natCast_mem #[n]⟩
 
 @[inclusionExt Finset.sum (Finset.range _) _]
 meta def evalRangeSum : InclusionExt where
-  eval e := do
+  family := `real.dyadic
+  derive e := do
     let (``Finset.sum, #[α, β, _, s, f]) := e.getAppFnArgs | failure
     unless ← isDefEq α (mkConst ``Nat) do failure
     unless ← isDefEq β (mkConst ``Real) do failure
@@ -189,7 +195,8 @@ meta def evalRangeSum : InclusionExt where
 
 @[inclusionExt gaussianIntegral]
 meta def evalGaussianIntegral : InclusionExt where
-  eval e := do
+  family := `real.dyadic
+  derive e := do
     unless e.isConstOf ``gaussianIntegral do failure
     let prec ← Large.precisionExpr
     return ⟨← mkAppM ``gaussianIntegralInterval #[prec],
@@ -197,8 +204,9 @@ meta def evalGaussianIntegral : InclusionExt where
 
 @[inclusionExt intervalIntegral (_ : ℝ → ℝ) _ _ volume]
 meta def evalGaussianIntegralExpr : InclusionExt where
+  family := `real.dyadic
   priority := 0
-  eval e := do
+  derive e := do
     unless ← isDefEq e (mkConst ``gaussianIntegral) do failure
     let prec ← Large.precisionExpr
     return ⟨← mkAppM ``gaussianIntegralInterval #[prec],

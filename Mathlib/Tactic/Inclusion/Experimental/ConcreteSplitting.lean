@@ -15,49 +15,55 @@ namespace Inclusion.Experimental
 
 deriving instance DecidableEq for Interval
 
-def allPiecesTrue {Iα : Type*} (pieces : Array Iα) (P : Iα → IntervalBool) : Bool :=
-  pieces.toList.all fun t => P t matches .true
+def coverMapListAux {Iα Iβ β : Type*} [ToSet Iβ β] [Coarsen Iβ β]
+    (head : Iα) : List Iα → (Iα → Iβ) → Iβ
+  | [], F => F head
+  | next :: rest, F =>
+      Coarsen.coarsen (Iα := Iβ) (α := β) (F head) (coverMapListAux next rest F)
 
-def checkPieces {Iα : Type*} (pieces : Array Iα) (P : Iα → IntervalBool) : IntervalBool :=
-  if allPiecesTrue pieces P
-  then .true
-  else .undetermined
+def coverMapList {Iα Iβ β : Type*} [ToSet Iβ β] [Coarsen Iβ β]
+    (source : Iα) : List Iα → (Iα → Iβ) → Iβ
+  | [], F => F source
+  | head :: rest, F => coverMapListAux head rest F
 
-theorem allPiecesTrue_eq_true {Iα : Type*} (pieces : Array Iα) (P : Iα → IntervalBool) :
-    allPiecesTrue pieces P = true ↔ ∀ t, t ∈ pieces → P t = IntervalBool.true := by
-  rw [allPiecesTrue, List.all_eq_true]
-  constructor
-  · intro h t ht
-    have ht' := h t (Array.mem_toList_iff.mpr ht)
-    cases hP : P t <;> simp_all
-  · intro h t ht
-    have hPt := h t (Array.mem_toList_iff.mp ht)
-    simp [hPt]
+theorem mem_coverMapListAux {Iα Iβ β : Type*} [ToSet Iβ β] [Coarsen Iβ β]
+    (head : Iα) (rest : List Iα) (F : Iα → Iβ) {t : Iα} {y : β}
+    (ht : t ∈ head :: rest) (hy : y ∈ F t) : y ∈ coverMapListAux head rest F := by
+  induction rest generalizing head with
+  | nil =>
+      simp only [List.mem_singleton] at ht
+      subst t
+      exact hy
+  | cons next rest ih =>
+      change y ∈ Coarsen.coarsen (Iα := Iβ) (α := β)
+        (F head) (coverMapListAux next rest F)
+      simp only [List.mem_cons] at ht
+      rcases ht with rfl | ht
+      · exact Coarsen.mem_coarsen_left hy
+      · exact Coarsen.mem_coarsen_right (ih next (by simpa only [List.mem_cons] using ht))
 
-theorem checkPieces_mem {Iα α : Type*} [ToSet Iα α] (pieces : Array Iα)
-    (P : Iα → IntervalBool) {p : Prop} {x : α}
-    (hcover : ∃ t, t ∈ pieces ∧ x ∈ t) (hp : ∀ t, x ∈ t → p ∈ P t) :
-    p ∈ checkPieces pieces P := by
-  obtain ⟨t, ht, hxt⟩ := hcover
-  unfold checkPieces
-  split <;> rename_i h
-  · have hPt := allPiecesTrue_eq_true pieces P |>.mp h t ht
-    simpa [hPt] using hp t hxt
-  · simpa [ToSet.toSet, IntervalBool.toPropSet] using Classical.em p
+theorem mem_coverMapList {Iα α Iβ β : Type*} [ToSet Iα α] [ToSet Iβ β] [Coarsen Iβ β]
+    (source : Iα) (pieces : List Iα) (F : Iα → Iβ) {x : α} {y : β}
+    (hx : x ∈ source) (hcover : ∃ t ∈ pieces, x ∈ t)
+    (hy : ∀ t, x ∈ t → y ∈ F t) : y ∈ coverMapList source pieces F := by
+  rcases pieces with _ | ⟨head, rest⟩
+  · exact hy source hx
+  · obtain ⟨t, ht, hxt⟩ := hcover
+    exact mem_coverMapListAux head rest F ht (hy t hxt)
 
-def CoverCheck.ofArray {Iα α : Type*} [ToSet Iα α] [DecidableEq Iα]
+def Cover.ofArray {Iα α : Type*} [ToSet Iα α] [DecidableEq Iα]
     (source : Iα) (pieces : Array Iα)
-    (hcover : (source : Set α) ⊆ ⋃ t ∈ pieces, (t : Set α)) : CoverCheck Iα α where
-  check s P := if s = source then checkPieces pieces P else P s
-  mem_check := by
-    intro s P p x hx hp
+    (hcover : (source : Set α) ⊆ ⋃ t ∈ pieces, (t : Set α)) : Cover Iα α where
+  coverMap := fun s F ↦ if s = source then coverMapList source pieces.toList F else F s
+  mem_coverMap := by
+    intro Iβ β _ _ s F x y hx hy
     split <;> rename_i h
-    · apply checkPieces_mem pieces P _ hp
+    · apply mem_coverMapList source pieces.toList F (h ▸ hx) _ hy
       have hx' := hcover (h ▸ hx)
       simp only [Set.mem_iUnion] at hx'
       obtain ⟨t, ht, hxt⟩ := hx'
-      exact ⟨t, ht, hxt⟩
-    · exact hp s hx
+      exact ⟨t, Array.mem_toList_iff.mpr ht, hxt⟩
+    · exact hy s hx
 
 class ConcreteIntervalCover (x : ℝ) where
   source : Interval Dyadic
@@ -66,8 +72,9 @@ class ConcreteIntervalCover (x : ℝ) where
 
 @[inclusionExt(_ : ℝ)]
 meta def evalConcreteIntervalIVar : InclusionExt where
+  family := `real.concrete
   priority := 0
-  eval e := do
+  derive e := do
     unless ← isDefEq (← inferType e) (mkConst ``Real) do failure
     let configType ← mkAppM ``ConcreteIntervalCover #[e]
     let config ← instantiateMVars (← whnf (← synthInstance configType))
@@ -75,8 +82,9 @@ meta def evalConcreteIntervalIVar : InclusionExt where
       | failure
     let setType ← mkAppM ``Interval #[mkConst ``Dyadic]
     let toSetInst ← synthInstance (← mkAppM ``ToSet #[setType, mkConst ``Real])
-    let coverCheck ← mkAppM ``CoverCheck.ofArray #[source, pieces, hcover]
-    let iVar ← mkIVar e setType toSetInst coverCheck
+    let cover ← mkAppM' (mkConst ``Cover.ofArray [.zero, .zero, .zero])
+      #[source, pieces, hcover]
+    let iVar ← mkIVar e setType toSetInst (some cover)
     return iVar.toExprInclusionBody
 
 syntax (name := inclusionCover) "inclusion_cover " term " in " term " with " term
@@ -86,7 +94,7 @@ elab "inclusion_cover_core" : tactic => withMainContext do
   let goal ← getMainGoal
   let goal ← goal.change (← goal.getType).consumeMData (checkDefEq := false)
   replaceMainGoal [goal]
-  inclusionTactic (← defaultInclusionConfig)
+  inclusionTactic { families := .ofList [`core, `real.dyadic, `real.concrete] }
 
 macro_rules
   | `(tactic| inclusion_cover $x in $source with $pieces using $cover) =>

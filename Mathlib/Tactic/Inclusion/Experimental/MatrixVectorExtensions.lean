@@ -266,36 +266,42 @@ meta def evalZeroBody (e : Expr) : InclusionM ExprInclusionBody := do
 
 @[inclusionExt Zero.zero]
 meta def evalZero : InclusionExt where
-  eval := evalZeroBody
+  family := `matrix.vector
+  derive := evalZeroBody
 
 @[inclusionExt OfNat.ofNat _]
 meta def evalOfNatZero : InclusionExt where
-  eval e := do
+  family := `matrix.vector
+  derive e := do
     let (``OfNat.ofNat, #[_, numeral, _]) := e.getAppFnArgs | failure
     guard (numeral.rawNatLit? == some 0)
     evalZeroBody e
 
 @[inclusionExt Neg.neg _]
 meta def evalNeg : InclusionExt where
-  eval e :=
+  family := `matrix.vector
+  derive e :=
     try evalVectorUnary e ``VectorBox.neg ``vector_neg_mem
     catch _ => evalMatrixUnary e ``MatrixBox.neg ``matrix_neg_mem
 
 @[inclusionExt _ + _]
 meta def evalAdd : InclusionExt where
-  eval e :=
+  family := `matrix.vector
+  derive e :=
     try evalVectorBinary e ``VectorBox.add ``vector_add_mem
     catch _ => evalMatrixBinary e ``MatrixBox.add ``matrix_add_mem
 
 @[inclusionExt _ - _]
 meta def evalSub : InclusionExt where
-  eval e :=
+  family := `matrix.vector
+  derive e :=
     try evalVectorBinary e ``VectorBox.sub ``vector_sub_mem
     catch _ => evalMatrixBinary e ``MatrixBox.sub ``matrix_sub_mem
 
 @[inclusionExt _ * _]
 meta def evalMatrixMul : InclusionExt where
-  eval e := do
+  family := `matrix.vector
+  derive e := do
     let (A, B) ← lastBinaryArgs e
     let some (m, n) ← matrixSizes? (← inferType A) | failure
     let some (n', p) ← matrixSizes? (← inferType B) | failure
@@ -310,7 +316,8 @@ meta def evalMatrixMul : InclusionExt where
 
 @[inclusionExt Matrix.mulVec _ _]
 meta def evalMulVec : InclusionExt where
-  eval e := do
+  family := `matrix.vector
+  derive e := do
     let (A, x) ← lastBinaryArgs e
     let some (m, n) ← matrixSizes? (← inferType A) | failure
     let some n' ← vectorSize? (← inferType x) | failure
@@ -324,7 +331,8 @@ meta def evalMulVec : InclusionExt where
 
 @[inclusionExt‖(_ : Fin _ → ℝ)‖]
 meta def evalVectorNorm : InclusionExt where
-  eval e := do
+  family := `matrix.vector
+  derive e := do
     let x ← lastUnaryArg e
     let some _ ← vectorSize? (← inferType x) | failure
     unless ← isDefEq (← inferType e) (mkConst ``Real) do failure
@@ -334,26 +342,26 @@ meta def evalVectorNorm : InclusionExt where
 
 @[inclusionExt(_ : Fin _ → ℝ)]
 meta def evalVectorIVar : InclusionExt where
+  family := `matrix.vector
   priority := eval_prio high
-  eval e := do
+  derive e := do
     let eType ← inferType e
     let some n ← vectorSize? eType | failure
     let setType ← mkAppM ``VectorBox #[n]
     let toSetInst ← synthInstance (← mkAppM ``ToSet #[setType, eType])
-    let coverCheck ← mkAppOptM ``CoverCheck.self #[setType, eType, toSetInst]
-    let iVar ← mkIVar e setType toSetInst coverCheck
+    let iVar ← mkIVar e setType toSetInst
     return iVar.toExprInclusionBody
 
 @[inclusionExt(_ : Matrix (Fin _) (Fin _) ℝ)]
 meta def evalMatrixIVar : InclusionExt where
+  family := `matrix.vector
   priority := eval_prio high
-  eval e := do
+  derive e := do
     let eType ← inferType e
     let some (m, n) ← matrixSizes? eType | failure
     let setType ← mkAppM ``MatrixBox #[m, n]
     let toSetInst ← synthInstance (← mkAppM ``ToSet #[setType, eType])
-    let coverCheck ← mkAppOptM ``CoverCheck.self #[setType, eType, toSetInst]
-    let iVar ← mkIVar e setType toSetInst coverCheck
+    let iVar ← mkIVar e setType toSetInst
     return iVar.toExprInclusionBody
 
 meta def closedBallArgs? (type : Expr) : MetaM (Option (Expr × Expr × Expr)) := do
@@ -362,37 +370,38 @@ meta def closedBallArgs? (type : Expr) : MetaM (Option (Expr × Expr × Expr)) :
   if args.size < 2 then return none
   return some (x, args[args.size - 2]!, args[args.size - 1]!)
 
-meta def deriveClosedBallHyp (h : Expr) : InclusionHypM (Array InclusionHypResult) := do
-  let some (x, center, radius) ← closedBallArgs? (← inferType h) | failure
-  let some { expr, iVarType } ← requestedIVar? x | return #[]
+meta def deriveClosedBallHyp (h type : Expr) : HypothesisM Unit := do
+  let some (x, center, radius) ← closedBallArgs? type | failure
+  let some { expr, iType } ← requestedIVar? x | return
   let (hull, hullMem) ←
-    match iVarType.setType.getAppFnArgs with
+    match iType.setType.getAppFnArgs with
     | (``VectorBox, #[_]) => pure (``VectorBox.closedBallHull, ``vector_closedBallHull_mem)
     | (``MatrixBox, #[_, _]) => pure (``MatrixBox.closedBallHull, ``matrix_closedBallHull_mem)
     | _ => failure
-  let centerFn ← mkHypInclusionFunction center iVarType
+  let centerFn ← mkHypInclusionFunction center iType
   let radiusSetType ← mkAppM ``Interval #[mkConst ``Dyadic]
   let radiusToSet ← synthInstance
     (← mkAppM ``ToSet #[radiusSetType, mkConst ``Real])
   let radiusType : IType := ⟨mkConst ``Real, radiusSetType, radiusToSet⟩
   let radiusFn ← mkHypInclusionFunction radius radiusType
-  let params := mergeInclusionParams centerFn.params radiusFn.params
-  let bound ← withInclusionParams params fun paramVars => do
-    let centerArgs ← inclusionParamArgs params paramVars centerFn.params
-    let radiusArgs ← inclusionParamArgs params paramVars radiusFn.params
+  let (params, argIndices) :=
+    mergeInclusionParams #[centerFn.params, radiusFn.params]
+  let hyp ← withInclusionParams params fun paramVars => do
+    let centerArgs := argIndices[0]!.map fun i => paramVars[i]!
+    let radiusArgs := argIndices[1]!.map fun i => paramVars[i]!
     let centerSet := (mkAppN centerFn.inclusion centerArgs).headBeta
     let centerProof := (mkAppN centerFn.proof centerArgs).headBeta
     let radiusSet := (mkAppN radiusFn.inclusion radiusArgs).headBeta
     let radiusProof := (mkAppN radiusFn.proof radiusArgs).headBeta
     let set ← mkAppM hull #[centerSet, radiusSet]
     let proof ← mkAppM hullMem #[centerProof, radiusProof, h]
-    return ⟨params, #[], iVarType,
-      ← mkLambdaFVars paramVars set (binderInfoForMVars := .default),
-      ← mkLambdaFVars paramVars proof (binderInfoForMVars := .default)⟩
-  return #[⟨expr, bound⟩]
+    return ⟨params, #[], iType,
+      ← mkLambdaFVars paramVars set, ← mkLambdaFVars paramVars proof⟩
+  addInclusionHypResult ⟨expr, hyp⟩
 
-@[inclusionHypRule _ ∈ Metric.closedBall _ _]
-meta def evalClosedBallHyp : InclusionHypRule where
+@[hypothesisExt _ ∈ Metric.closedBall _ _]
+meta def evalClosedBallHyp : HypothesisExt where
+  family := `matrix.vector
   derive := deriveClosedBallHyp
 
 end Inclusion.MatrixVector

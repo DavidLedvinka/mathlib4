@@ -8,11 +8,9 @@ set_option linter.style.header false
 
 namespace Inclusion
 
-variable {Iα α : Type*}
-
-/-- A procedure for checking a predicate on sufficiently many refinements of a represented set. -/
+/-- A procedure for covering a represented set by sufficiently many refinements. -/
 class Splitter (Iα α : Type*) [ToSet Iα α] where
-  /-- The cover check obtained by refining a represented set to depth `n`. -/
-  coverCheck (n : ℕ) : CoverCheck Iα α
+  /-- The cover obtained by refining a represented set to depth `n`. -/
+  cover (n : ℕ) : Cover.{0} Iα α
 
 end Inclusion

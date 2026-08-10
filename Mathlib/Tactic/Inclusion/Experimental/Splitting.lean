@@ -17,70 +17,49 @@ def half (x : Dyadic) : Dyadic :=
 
 def midpoint (a b : Dyadic) : Dyadic := half (a + b)
 
-def splitCheckAux : ℕ → Interval Dyadic → (Interval Dyadic → IntervalBool) → IntervalBool
-  | 0, I, P => P I
-  | n + 1, I, P =>
+@[specialize]
+def bisectCoverMap {Iβ β : Type*} [ToSet Iβ β] [Coarsen Iβ β] :
+    ℕ → Interval Dyadic → (Interval Dyadic → Iβ) → Iβ
+  | 0, I, F => F I
+  | n + 1, I, F =>
       match I with
       | ⟨some l, some u⟩ =>
           let m := midpoint l u
-          match splitCheckAux n ⟨l, m⟩ P with
-          | .true => splitCheckAux n ⟨m, u⟩ P
-          | .false | .undetermined => .undetermined
-      | _ => splitCheckAux n I P
+          Coarsen.coarsen (Iα := Iβ) (α := β) (bisectCoverMap n ⟨l, m⟩ F)
+            (bisectCoverMap n ⟨m, u⟩ F)
+      | _ => bisectCoverMap n I F
 
-def splitCheck (n : ℕ) (I : Interval Dyadic)
-    (P : Interval Dyadic → IntervalBool) : IntervalBool :=
-  match splitCheckAux n I P with
-  | .true => .true
-  | .false | .undetermined => .undetermined
-
-theorem splitCheckAux_sound (n : ℕ) (I : Interval Dyadic)
-    (P : Interval Dyadic → IntervalBool) (hcheck : splitCheckAux n I P = IntervalBool.true)
-    (r : ℝ) (hr : r ∈ I) : ∃ J, r ∈ J ∧ P J = IntervalBool.true := by
+theorem mem_bisectCoverMap {Iβ β : Type*} [ToSet Iβ β] [Coarsen Iβ β]
+    (n : ℕ) (I : Interval Dyadic) (F : Interval Dyadic → Iβ) {y : β} {r : ℝ}
+    (hr : r ∈ I) (hy : ∀ J, r ∈ J → y ∈ F J) : y ∈ bisectCoverMap n I F := by
   induction n generalizing I with
-  | zero => exact ⟨I, hr, hcheck⟩
+  | zero => exact hy I hr
   | succ n ih =>
       rcases I with ⟨lb, ub⟩
       cases lb with
-      | bot =>
-          cases ub with
-          | top => exact ih _ hcheck hr
-          | coe u => exact ih _ hcheck hr
+      | bot => exact ih ⟨⊥, ub⟩ hr
       | coe l =>
-          cases ub with
-          | top => exact ih _ hcheck hr
-          | coe u =>
-              let m := midpoint l u
-              let left : Interval Dyadic := ⟨l, m⟩
-              let right : Interval Dyadic := ⟨m, u⟩
-              have hboth :
-                  splitCheckAux n left P = IntervalBool.true ∧
-                    splitCheckAux n right P = IntervalBool.true := by
-                change (match splitCheckAux n left P with
-                  | .true => splitCheckAux n right P
-                  | .false | .undetermined => .undetermined) = .true at hcheck
-                revert hcheck
-                cases splitCheckAux n left P <;> simp
-              by_cases h : r ≤ Dyadic.toReal m
-              · exact ih left hboth.1 ⟨hr.1, WithTop.coe_le_coe.mpr h⟩
-              · exact ih right hboth.2 ⟨WithBot.coe_le_coe.mpr (le_of_not_ge h), hr.2⟩
+        cases ub with
+        | top => exact ih ⟨l, ⊤⟩ hr
+        | coe u =>
+          let m := midpoint l u
+          let left : Interval Dyadic := ⟨l, m⟩
+          let right : Interval Dyadic := ⟨m, u⟩
+          change y ∈ Coarsen.coarsen (Iα := Iβ) (α := β)
+            (bisectCoverMap n left F) (bisectCoverMap n right F)
+          by_cases hl : r ≤ Dyadic.toReal m
+          · apply Coarsen.mem_coarsen_left (Iα := Iβ) (α := β)
+            exact ih left ⟨hr.1, WithTop.coe_le_coe.mpr hl⟩
+          · apply Coarsen.mem_coarsen_right (Iα := Iβ) (α := β)
+            exact ih right ⟨WithBot.coe_le_coe.mpr (le_of_not_ge hl), hr.2⟩
 
-theorem splitCheck_mem (n : ℕ) (I : Interval Dyadic)
-    (P : Interval Dyadic → IntervalBool) {p : Prop} {r : ℝ} (hr : r ∈ I)
-    (hp : ∀ J, r ∈ J → p ∈ P J) : p ∈ splitCheck n I P := by
-  cases hcheck : splitCheckAux n I P with
-  | true =>
-      obtain ⟨J, hrJ, hJ⟩ := splitCheckAux_sound n I P hcheck r hr
-      simpa [splitCheck, hcheck, hJ] using hp J hrJ
-  | false =>
-      simpa [splitCheck, hcheck, ToSet.toSet, IntervalBool.toPropSet] using Classical.em p
-  | undetermined =>
-      simpa [splitCheck, hcheck, ToSet.toSet, IntervalBool.toPropSet] using Classical.em p
+def bisectCover (n : ℕ) : Cover (Interval Dyadic) ℝ where
+  coverMap := fun I F ↦ bisectCoverMap n I F
+  mem_coverMap := by
+    intro Iβ β _ _ I F x y hx hy
+    exact mem_bisectCoverMap n I F hx hy
 
 instance : Splitter (Interval Dyadic) ℝ where
-  coverCheck n := {
-    check := splitCheck n
-    mem_check := splitCheck_mem n
-  }
+  cover := bisectCover
 
 end Inclusion.Experimental

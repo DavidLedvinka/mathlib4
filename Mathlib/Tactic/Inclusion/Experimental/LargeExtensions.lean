@@ -440,8 +440,9 @@ meta def precisionExpr : InclusionM Expr := do
 
 @[inclusionExt OfNat.ofNat _]
 meta def evalOfNat : InclusionExt where
+  family := `real.dyadic
   priority := 0
-  eval e := do
+  derive e := do
     let (``OfNat.ofNat, #[alpha, n, _]) := e.getAppFnArgs | failure
     unless ← isDefEq alpha (mkConst ``Real) do failure
     guard n.isRawNatLit
@@ -449,22 +450,26 @@ meta def evalOfNat : InclusionExt where
 
 @[inclusionExt _ + _]
 meta def evalAdd : InclusionExt where
+  family := `real.dyadic
   priority := 0
-  eval e := Inclusion.evalBinary e ``add ``add_mem
+  derive e := Inclusion.evalBinary e ``add ``add_mem
 
 @[inclusionExt _ - _]
 meta def evalSub : InclusionExt where
+  family := `real.dyadic
   priority := 0
-  eval e := Inclusion.evalBinary e ``sub ``sub_mem
+  derive e := Inclusion.evalBinary e ``sub ``sub_mem
 
 @[inclusionExt _ * _]
 meta def evalMul : InclusionExt where
+  family := `real.dyadic
   priority := 0
-  eval e := Inclusion.evalBinary e ``mul ``mul_mem
+  derive e := Inclusion.evalBinary e ``mul ``mul_mem
 
 @[inclusionExt OfScientific.ofScientific _ _ _]
 meta def evalScientific : InclusionExt where
-  eval e := do
+  family := `real.dyadic
+  derive e := do
     let (``OfScientific.ofScientific, #[alpha, _, m, s, exponent]) := e.getAppFnArgs | failure
     unless ← isDefEq alpha (mkConst ``Real) do failure
     let prec ← precisionExpr
@@ -473,7 +478,8 @@ meta def evalScientific : InclusionExt where
 
 @[inclusionExt _ ^ _]
 meta def evalPow : InclusionExt where
-  eval e := do
+  family := `real.dyadic
+  derive e := do
     let (``HPow.hPow, #[alpha, beta, gamma, _, x, n]) := e.getAppFnArgs | failure
     unless ← isDefEq alpha (mkConst ``Real) do failure
     unless ← isDefEq beta (mkConst ``Nat) do failure
@@ -484,7 +490,8 @@ meta def evalPow : InclusionExt where
 
 @[inclusionExt Real.sqrt _]
 meta def evalSqrt : InclusionExt where
-  eval e := do
+  family := `real.dyadic
+  derive e := do
     let body ← mkExprInclusionBody (← realUnaryArg e)
     let prec ← precisionExpr
     return ⟨← mkAppM ``sqrt #[prec, body.inclusionBody],
@@ -492,7 +499,8 @@ meta def evalSqrt : InclusionExt where
 
 @[inclusionExt Real.exp _]
 meta def evalExp : InclusionExt where
-  eval e := do
+  family := `real.dyadic
+  derive e := do
     let body ← mkExprInclusionBody (← realUnaryArg e)
     let prec ← precisionExpr
     return ⟨← mkAppM ``exp #[prec, body.inclusionBody],
@@ -500,14 +508,16 @@ meta def evalExp : InclusionExt where
 
 @[inclusionExt Real.pi]
 meta def evalPi : InclusionExt where
-  eval e := do
+  family := `real.dyadic
+  derive e := do
     unless e.isConstOf ``Real.pi do failure
     let prec ← precisionExpr
     return ⟨← mkAppM ``pi #[prec], ← mkAppM ``pi_mem #[prec]⟩
 
 @[inclusionExt(_ : ℝ) < (_ : ℝ)]
 meta def evalLt : InclusionExt where
-  eval e := do
+  family := `real.dyadic
+  derive e := do
     let (``LT.lt, #[_, _, a, b]) := e.getAppFnArgs | failure
     unless ← isDefEq (← inferType a) (mkConst ``Real) do failure
     unless ← isDefEq (← inferType b) (mkConst ``Real) do failure
@@ -518,7 +528,8 @@ meta def evalLt : InclusionExt where
 
 @[inclusionExt(_ : ℝ) > (_ : ℝ)]
 meta def evalGt : InclusionExt where
-  eval e := do
+  family := `real.dyadic
+  derive e := do
     let (``GT.gt, #[_, _, b, a]) := e.getAppFnArgs | failure
     unless ← isDefEq (← inferType a) (mkConst ``Real) do failure
     unless ← isDefEq (← inferType b) (mkConst ``Real) do failure
