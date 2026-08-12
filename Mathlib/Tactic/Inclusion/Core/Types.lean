@@ -62,36 +62,31 @@ def IVar.type (iVar : IVar) : IType := iVar.iExpr.iType
 /-- The associated expression of an `IVar`. -/
 def IVar.expr (iVar : IVar) : Expr := iVar.iExpr.expr
 
-/-- An `ExprInclusionFunction` is a structure associated with an expression `e`, that specifies
-a function for computing the inclusion of `e` in some set and the proof that this computation
-is correct. -/
-structure ExprInclusionFunction where
+/-- An `ExprInclusion` is a structure associated with an expression `e`, that specifies a function
+for computing the inclusion of `e` in some set and the proof that this computation is correct. -/
+structure ExprInclusion where
   /-- The array of inclusion parameters used in the inclusion function. -/
   params : Array Name
-  /-- The array of inclusion expressions that are substituted for inclusion variables in the
-  inclusion function. -/
-  iExprs : Array IExpr
   /-- The types of the inclusion result. -/
-  outputType : IType
-  /-- The expression of the inclusion function of type `ℕ → ... → ℕ → Iα₀ → ... → Iαₙ → Iβ`, with
-  one `ℕ` argument for each inclusion parameter and one `Iαᵢ` argument for each inclusion
-  variable. -/
+  iType : IType
+  /-- The expression of the inclusion function of type `ℕ → ... → ℕ → Iβ`, with one `ℕ`
+  argument for each inclusion parameter. -/
   inclusion : Expr
-  /-- A proof of
-  `∀ n₀ ... nₖ s₀ ... sₘ, iExprs[0].expr ∈ s₀ → ... → iExprs[m].expr ∈ sₘ →`
-  `e ∈ inclusion n₀ ... nₖ s₀ ... sₘ`, where `e` is the represented expression. -/
+  /-- A proof of `∀ n₀ ... nₖ, e ∈ inclusion n₀ ... nₖ`, where `e` is the represented expression
+  and there is one `ℕ` argument for each inclusion parameter. -/
   proof : Expr
   deriving Inhabited
 
 /-- An `ExprInclusionBody` is an intermediate structure used in the process of building the
-`ExprInclusionFunction` associated to an expression `e`. It contains an `inclusionBody` and
-`proofBody` which contain the (possibly partially completed) body of the `inclusion` and `proof`
-expressions of the `ExprInclusionFunction` respectively. -/
+`ExprInclusion` associated to an expression `e`. It contains an `inclusionBody` and `proofBody`
+which contain the (possibly partially completed) body of the `inclusion` and `proof` expressions
+of the `ExprInclusion` respectively. -/
 structure ExprInclusionBody where
   /-- The (possibly partially completed) body of the inclusion function. -/
   inclusionBody : Expr
   /-- The (possibly partially completed) proof of `e ∈ inclusionBody`. -/
   proofBody : Expr
+  deriving Inhabited
 
 /-- Convert an `IVar` to an `ExprInclusionBody`. -/
 def IVar.toExprInclusionBody (iVar : IVar) : ExprInclusionBody := ⟨iVar.setVar, iVar.hypVar⟩
@@ -106,8 +101,8 @@ structure InclusionM.Context where
   localInstances : LocalInstances
   /-- The names of the explicitly enabled inclusion parameters. -/
   enabledParams : NameSet
-  /-- The names of the enabled inclusion-extension families. -/
-  enabledFamilies : Array Name
+  /-- The names of the inclusion-extension families to use. -/
+  families : Array Name
 
 /-- The mutable state of the `InclusionM` monad. -/
 structure InclusionM.State where
@@ -116,7 +111,7 @@ structure InclusionM.State where
   /-- The inclusion parameter variables used during construction, indexed by name. -/
   usedParams : NameMap Expr := {}
 
-/-- The monad used by the `inclusion` tactic during the construction of `ExprInclusionFunction`s. -/
+/-- The monad used by the `inclusion` tactic during the construction of `ExprInclusion`s. -/
 abbrev InclusionM := ReaderT InclusionM.Context <| StateT InclusionM.State MetaM
 
 instance : MonadBacktrack (Meta.SavedState × InclusionM.State) InclusionM where
@@ -125,33 +120,35 @@ instance : MonadBacktrack (Meta.SavedState × InclusionM.State) InclusionM where
     s.1.restore
     set s.2
 
-/-- Run the `InclusionM` monad in `MetaM`. -/
+/-- Run the `InclusionM` monad with an explicit context and initial state. -/
+def InclusionM.runWith {α : Type} (x : InclusionM α) (context : InclusionM.Context)
+    (state : InclusionM.State := {}) : MetaM (α × InclusionM.State) :=
+  StateT.run (ReaderT.run x context) state
+
+/-- Run the `InclusionM` monad using the current local context. -/
 def InclusionM.run {α : Type} (x : InclusionM α) (enabledParams : NameSet := {})
-    (enabledFamilies : Array Name := #[]) : MetaM α := do
+    (families : Array Name := #[]) : MetaM α := do
   let localContext ← getLCtx
   let localInstances ← getLocalInstances
-  StateT.run' (ReaderT.run x { localContext, localInstances, enabledParams, enabledFamilies }) {}
+  return (← x.runWith { localContext, localInstances, enabledParams, families }).1
 
 end InclusionM
 
 section HypothesisM
 
 /-- The fixed context of the `HypothesisM` monad. -/
-structure HypothesisM.Context where
-  /-- The requested inclusion expressions, stored as an `ExprMap` from the expressions to their
-  `IExpr`s. -/
-  iExprsMap : ExprMap IExpr
-  /-- The requested inclusion expressions, stored as an `Array` of `IExpr`s. -/
-  iExprsArray : Array IExpr
-  /-- The names of the explicitly enabled inclusion parameters. -/
-  enabledParams : NameSet
-  /-- The names of the enabled inclusion-extension families. -/
-  enabledFamilies : Array Name
+structure HypothesisM.Context extends InclusionM.Context where
+  /-- The inclusion variables indexed by their associated expressions. -/
+  iVarsMap : ExprMap IVar
+  /-- The inclusion variables whose hypotheses are being constructed. -/
+  iVars : Array IVar
 
 /-- The mutable state of the `HypothesisM` monad. -/
 structure HypothesisM.State where
-  /-- The candidate inclusion functions derived for each requested expression. -/
-  inclusions : ExprMap (Array ExprInclusionFunction) := {}
+  /-- The inclusion parameter variables shared with the goal computation and any hypotheses. -/
+  usedParams : NameMap Expr := {}
+  /-- The candidate inclusion bodies derived for each requested expression. -/
+  inclusions : ExprMap (Array ExprInclusionBody) := {}
 
 /-- The monad used by the `inclusion` tactic to construct initial inclusion hypotheses. -/
 abbrev HypothesisM := ReaderT HypothesisM.Context <| StateT HypothesisM.State MetaM
@@ -162,11 +159,15 @@ instance : MonadBacktrack (Meta.SavedState × HypothesisM.State) HypothesisM whe
     s.1.restore
     set s.2
 
-/-- Run the `HypothesisM` monad in `MetaM`. -/
-def HypothesisM.run {α : Type} (x : HypothesisM α) (iExprsArray : Array IExpr)
-    (enabledParams : NameSet) (enabledFamilies : Array Name := #[]) : MetaM α := do
-  let iExprsMap := iExprsArray.foldl (fun iExprsMap iExpr => iExprsMap.insert iExpr.expr iExpr) {}
-  StateT.run' (ReaderT.run x { iExprsMap, iExprsArray, enabledParams, enabledFamilies }) {}
+/-- Run the `HypothesisM` monad using the context and state of the current `InclusionM`
+computation. -/
+def HypothesisM.run {α : Type} (x : HypothesisM α) : InclusionM α := do
+  let inclusionContext ← read
+  let inclusionState ← get
+  let iVars := inclusionState.iVars.valuesArray
+  liftM <| StateT.run' (ReaderT.run x
+    { toContext := inclusionContext, iVarsMap := inclusionState.iVars, iVars })
+    { usedParams := inclusionState.usedParams }
 
 end HypothesisM
 

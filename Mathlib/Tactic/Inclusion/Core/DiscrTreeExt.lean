@@ -13,7 +13,7 @@ public meta import Lean.Meta.DiscrTree
 # Discrimination-tree-indexed environment extensions
 
 This file provides an API for scoped environment extensions whose declarations are indexed by
-elaborated expression patterns in named `DiscrTree`s.
+elaborated expression patterns in a `DiscrTree`.
 -/
 
 public meta section
@@ -27,33 +27,27 @@ def evalDecl (α : Type) (typeName declName : Name) : ImportM α := do
   let { env, opts, .. } ← read
   IO.ofExcept <| unsafe env.evalConstCheck α opts typeName declName
 
-/-- The tree name, discrimination-tree paths, and declaration name stored in an `.olean` entry. -/
-abbrev Entry := Name × Array (Array DiscrTree.Key) × Name
+/-- The discrimination-tree paths and declaration name stored in an `.olean` entry. -/
+abbrev Entry := Array (Array DiscrTree.Key) × Name
 
-/-- The state of a named-discrimination-tree environment extension. -/
+/-- The state of a discrimination-tree environment extension. -/
 structure State (α : Type) where
-  /-- The evaluated declaration values indexed first by tree name and then by expression pattern. -/
-  tree : NameMap (DiscrTree α) := {}
+  /-- The discrimintation-tree of the extension. -/
+  tree : DiscrTree α := {}
   deriving Inhabited
 
-/-- A scoped environment extension containing declaration values indexed by a tree name and
-expression patterns. -/
+/-- A scoped environment extension containing declaration values indexed by expression patterns. -/
 abbrev EnvExt (α : Type) := ScopedEnvExtension Entry (Entry × α) (State α)
 
 variable {α : Type}
 
-/-- Return the declaration values in `treeNames` whose patterns match `e`. -/
-def State.getMatch (state : State α) (treeNames : Array Name) (e : Expr) : MetaM (Array α) := do
-  let mut matched := #[]
-  for treeName in treeNames do
-    if let some tree := state.tree.find? treeName then
-      matched := matched ++ (← tree.getMatch e)
-  return matched
+/-- Return the declaration values whose patterns match `e`. -/
+def State.getMatch (state : State α) (e : Expr) : MetaM (Array α) :=
+  state.tree.getMatch e
 
 /-- Return the declaration values whose patterns match `e`, ordered by increasing priority. -/
-def State.getSortedMatch (state : State α) (treeNames : Array Name) (e : Expr)
-    (priority : α → Nat) : MetaM (Array α) := do
-  return (← state.getMatch treeNames e).qsort fun a b => priority a < priority b
+def State.getSortedMatch (state : State α) (e : Expr) (priority : α → Nat) : MetaM (Array α) := do
+  return (← state.getMatch e).qsort fun a b => priority a < priority b
 
 /-- Create a scoped environment extension whose declarations have type `typeName`. By default, the
 environment extension is named after the declaration in which this function is called. -/
@@ -65,11 +59,10 @@ def initializeEnvExt (typeName : Name)
   registerScopedEnvExtension {
     name := envExtName
     mkInitial := pure {}
-    ofOLeanEntry := fun _ e@(_, _, n) ↦ return (e, ← evalDecl α typeName n)
+    ofOLeanEntry := fun _ e@(_, n) ↦ return (e, ← evalDecl α typeName n)
     toOLeanEntry := (·.1)
-    addEntry := fun state ((treeName, kss, _), ext) ↦
-      let discrTree := state.tree.find? treeName |>.getD {}
-      { tree := state.tree.insert treeName (insert kss ext discrTree) }
+    addEntry := fun state ((kss, _), ext) ↦
+      { tree := insert kss ext state.tree }
   }
 
 /-- Elaborate expression patterns into `DiscrTree` paths. -/
@@ -82,16 +75,15 @@ def elabExtKeys (patterns : Array Syntax) : CoreM (Array (Array DiscrTree.Key)) 
         return e
     DiscrTree.mkPath e
 
-/-- Evaluate `declName` and add it to the tree selected by `treeOf` under the given expression
-patterns. -/
+/-- Evaluate `declName` and add it to `envExt` under the given expression patterns. -/
 def addDecl (attrName : Name) (envExt : EnvExt α) (typeName declName : Name)
-    (treeOf : α → Name) (patterns : Array Syntax) (kind : AttributeKind) : AttrM Unit := do
+    (patterns : Array Syntax) (kind : AttributeKind) : AttrM Unit := do
   let env ← getEnv
   ensureAttrDeclIsMeta attrName declName kind
   unless (env.getModuleIdxFor? declName).isNone do
     throwError "invalid attribute `{attrName}`, declaration is in an imported module"
   if (IR.getSorryDep env declName).isSome then return
   let ext ← evalDecl α typeName declName
-  envExt.add ((treeOf ext, ← elabExtKeys patterns, declName), ext) kind
+  envExt.add ((← elabExtKeys patterns, declName), ext) kind
 
 end DiscrTreeExt

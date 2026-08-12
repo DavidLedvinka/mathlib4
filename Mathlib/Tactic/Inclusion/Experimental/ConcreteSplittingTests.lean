@@ -33,7 +33,7 @@ theorem concretePieces_cover :
 example {x : ℝ} (_hx : x ∈ concreteInterval) : True := by
   fail_if_success
     have : x - x ≤ 1 / 2 := by
-      inclusion
+      inclusion [core, real.dyadic]
   trivial
 
 example {x : ℝ} (hx : x ∈ concreteInterval) : x - x ≤ 1 / 2 := by

@@ -39,26 +39,24 @@ def mkToSetMem (xType setType x s toSetInst : Expr) : MetaM Expr := do
 def IExpr.mkMem (iExpr : IExpr) (set : Expr) : MetaM Expr :=
   mkToSetMem iExpr.iType.elemType iExpr.iType.setType iExpr.expr set iExpr.iType.toSetInst
 
-/-- Given `iVar : IVar` and expressions `cover : Cover iVar.type.setType iVar.type.elemType`,
-`coarsen : Coarsen outputType.setType outputType.elemType`, and
-`inclusion : iVar.type.setType → outputType.setType`, create the corresponding application of
-`Cover.coverMap`. -/
+/-- Given `iVar : IVar`, an inclusion set `source`, and expressions for a cover, coarsener, and
+inclusion function, create the corresponding application of `Cover.coverMap`. -/
 def IVar.mkCoverMap (iVar : IVar) (outputType : IType)
-    (cover coarsen inclusion : Expr) : MetaM Expr :=
+    (source cover coarsen inclusion : Expr) : MetaM Expr :=
   mkAppOptM ``Cover.coverMap
     #[iVar.type.setType, iVar.type.elemType, iVar.type.toSetInst, cover,
       outputType.setType, outputType.elemType, outputType.toSetInst, coarsen,
-      iVar.setVar, inclusion]
+      source, inclusion]
 
-/-- Given `iVar : IVar`, `output : IExpr`, and expressions for a cover, coarsener, inclusion
-function, and the corresponding pointwise inclusion proof, create an application of
+/-- Given `iVar : IVar`, `output : IExpr`, a source inclusion body, and expressions for a cover,
+coarsener, inclusion function, and its pointwise inclusion proof, create an application of
 `Cover.mem_coverMap`. -/
 def IVar.mkCoverMapProof (iVar : IVar) (output : IExpr)
-    (cover coarsen inclusion proof : Expr) : MetaM Expr :=
+    (source : ExprInclusionBody) (cover coarsen inclusion proof : Expr) : MetaM Expr :=
   mkAppOptM ``Cover.mem_coverMap
     #[iVar.type.setType, iVar.type.elemType, iVar.type.toSetInst, cover,
       output.iType.setType, output.iType.elemType, output.iType.toSetInst, coarsen,
-      iVar.setVar, inclusion, iVar.expr, output.expr, iVar.hypVar, proof]
+      source.inclusionBody, inclusion, iVar.expr, output.expr, source.proofBody, proof]
 
 /-- Given `iType : IType`, synthesize an expression of type
 `Coarsen iType.setType iType.elemType`. -/
@@ -96,37 +94,15 @@ def IType.synthUniv (iType : IType) : MetaM Expr := do
   try synthInstance type catch _ =>
     throwError "No `Univ` instance is registered for {iType.setType}"
 
+/-- Given an expression `b : IntervalBool`, create the expression proving `b = b`. -/
+def mkIntervalBoolRefl (b : Expr) : Expr :=
+  mkApp2 (mkConst ``Eq.refl [.succ .zero]) (mkConst ``IntervalBool) b
+
 /-- Given an inclusion function `fn` for `goal`, expressions for its parameters and result, and a
 proof that the result is `IntervalBool.true`, create an expression proving `goal`. -/
-def ExprInclusionFunction.mkGoalProof (fn : ExprInclusionFunction) (goal : Expr)
+def ExprInclusion.mkGoalProof (fn : ExprInclusion) (goal : Expr)
     (paramExprs : Array Expr) (inclusionExpr inclusionProof : Expr) : Expr :=
   mkAppN (mkConst ``true_of_mem_intervalBool_eq_true)
     #[goal, inclusionExpr, mkAppN fn.proof paramExprs, inclusionProof]
-
-/-- Introduce an array of `Nat` free variables for each param in `params` into the local context
-and pass the resulting array to `k`. -/
-def withInclusionParams {α : Type} [Inhabited α] (params : Array Name)
-    (k : Array Expr → MetaM α) : MetaM α :=
-  withLocalDeclsDND (params.map fun name => (name, mkConst ``Nat)) k
-
-/-- **TODO (NOT FOR CODEX)** -/
-def mergeInclusionParams (paramArrays : Array (Array Name)) :
-    Array Name × Array (Array Nat) := Id.run do
-  let mut params := #[]
-  let mut positions : NameMap Nat := {}
-  let mut argIndices := Array.emptyWithCapacity paramArrays.size
-  for inputParams in paramArrays do
-    let mut indices := Array.emptyWithCapacity inputParams.size
-    for param in inputParams do
-      let i ← match positions.find? param with
-        | some i => pure i
-        | none => do
-          let i := params.size
-          params := params.push param
-          positions := positions.insert param i
-          pure i
-      indices := indices.push i
-    argIndices := argIndices.push indices
-  return (params, argIndices)
 
 end Inclusion

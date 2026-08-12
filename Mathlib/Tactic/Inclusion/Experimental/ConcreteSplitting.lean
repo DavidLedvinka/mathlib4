@@ -2,6 +2,7 @@ module
 
 public import Mathlib.Tactic.Inclusion.Experimental.Splitting
 public meta import Mathlib.Tactic.Inclusion.Experimental.Splitting
+public meta import Mathlib.Tactic.Inclusion.Experimental.Families
 public import Init.Data.Array.Lemmas
 
 set_option linter.style.header false
@@ -70,9 +71,8 @@ class ConcreteIntervalCover (x : ℝ) where
   pieces : Array (Interval Dyadic)
   cover : (source : Set ℝ) ⊆ ⋃ t ∈ pieces, (t : Set ℝ)
 
-@[inclusionExt(_ : ℝ)]
+@[inclusionExt real.concrete | (_ : ℝ)]
 meta def evalConcreteIntervalIVar : InclusionExt where
-  family := `real.concrete
   priority := 0
   derive e := do
     unless ← isDefEq (← inferType e) (mkConst ``Real) do failure

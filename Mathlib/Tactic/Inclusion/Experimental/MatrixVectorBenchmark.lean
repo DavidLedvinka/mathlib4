@@ -45,11 +45,11 @@ def unitRange : Interval Dyadic := ⟨(-1 : Dyadic), (1 : Dyadic)⟩
 #time_with_kernel theorem generated_10x10_mulVec {A : Mat10} {x : Vec10}
     (hA : A ∈ generatedMatrixBounds) (hx : x ∈ generatedVectorBounds) :
     ‖A *ᵥ x‖ ≤ 10 := by
-  inclusion [+matrix.vector]
+  inclusion [core, real.dyadic, matrix.vector]
 
 #time_with_kernel theorem notation_10x10_mulVec {A : Mat10} {x : Vec10}
     (hA : A ∈ notationMatrixBounds) (hx : x ∈ notationVectorBounds) :
     ‖A *ᵥ x‖ ≤ 10 := by
-  inclusion [+matrix.vector]
+  inclusion [core, real.dyadic, matrix.vector]
 
 end Inclusion.MatrixVector.Benchmark

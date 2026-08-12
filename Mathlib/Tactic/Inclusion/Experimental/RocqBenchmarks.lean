@@ -19,6 +19,6 @@ set_option inclusion.large.precision 30 in
     12 - 14.2 * Real.exp (-0.318 * x) +
       (3.25 * Real.cos (1.16 * x) - 0.155 * Real.sin (1.16 * x)) *
         Real.exp (-1.34 * x) > 0 := by
-  inclusion [split := 4]
+  inclusion [core, real.dyadic] (split := 4)
 
 end Inclusion.Experimental.RocqBenchmark

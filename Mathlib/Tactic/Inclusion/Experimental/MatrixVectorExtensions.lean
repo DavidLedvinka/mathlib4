@@ -2,6 +2,7 @@ module
 
 public import Mathlib.Tactic.Inclusion.Extension.Extensions
 public meta import Mathlib.Tactic.Inclusion.Extension.Extensions
+public meta import Mathlib.Tactic.Inclusion.Experimental.Families
 public import Mathlib.Analysis.Matrix.Normed
 public import Mathlib.LinearAlgebra.Matrix.Notation
 
@@ -264,43 +265,37 @@ meta def evalZeroBody (e : Expr) : InclusionM ExprInclusionBody := do
     return ⟨← mkAppM ``MatrixBox.zero #[m, n], ← mkAppM ``matrix_zero_mem #[m, n]⟩
   failure
 
-@[inclusionExt Zero.zero]
+@[inclusionExt matrix.vector | Zero.zero]
 meta def evalZero : InclusionExt where
-  family := `matrix.vector
   derive := evalZeroBody
 
-@[inclusionExt OfNat.ofNat _]
+@[inclusionExt matrix.vector | OfNat.ofNat _]
 meta def evalOfNatZero : InclusionExt where
-  family := `matrix.vector
   derive e := do
     let (``OfNat.ofNat, #[_, numeral, _]) := e.getAppFnArgs | failure
     guard (numeral.rawNatLit? == some 0)
     evalZeroBody e
 
-@[inclusionExt Neg.neg _]
+@[inclusionExt matrix.vector | Neg.neg _]
 meta def evalNeg : InclusionExt where
-  family := `matrix.vector
   derive e :=
     try evalVectorUnary e ``VectorBox.neg ``vector_neg_mem
     catch _ => evalMatrixUnary e ``MatrixBox.neg ``matrix_neg_mem
 
-@[inclusionExt _ + _]
+@[inclusionExt matrix.vector | _ + _]
 meta def evalAdd : InclusionExt where
-  family := `matrix.vector
   derive e :=
     try evalVectorBinary e ``VectorBox.add ``vector_add_mem
     catch _ => evalMatrixBinary e ``MatrixBox.add ``matrix_add_mem
 
-@[inclusionExt _ - _]
+@[inclusionExt matrix.vector | _ - _]
 meta def evalSub : InclusionExt where
-  family := `matrix.vector
   derive e :=
     try evalVectorBinary e ``VectorBox.sub ``vector_sub_mem
     catch _ => evalMatrixBinary e ``MatrixBox.sub ``matrix_sub_mem
 
-@[inclusionExt _ * _]
+@[inclusionExt matrix.vector | _ * _]
 meta def evalMatrixMul : InclusionExt where
-  family := `matrix.vector
   derive e := do
     let (A, B) ← lastBinaryArgs e
     let some (m, n) ← matrixSizes? (← inferType A) | failure
@@ -314,9 +309,8 @@ meta def evalMatrixMul : InclusionExt where
     return ⟨← mkAppM ``MatrixBox.mul #[left.inclusionBody, right.inclusionBody],
       ← mkAppM ``matrix_mul_mem #[left.proofBody, right.proofBody]⟩
 
-@[inclusionExt Matrix.mulVec _ _]
+@[inclusionExt matrix.vector | Matrix.mulVec _ _]
 meta def evalMulVec : InclusionExt where
-  family := `matrix.vector
   derive e := do
     let (A, x) ← lastBinaryArgs e
     let some (m, n) ← matrixSizes? (← inferType A) | failure
@@ -329,9 +323,8 @@ meta def evalMulVec : InclusionExt where
     return ⟨← mkAppM ``MatrixBox.mulVec #[matrixBody.inclusionBody, vectorBody.inclusionBody],
       ← mkAppM ``mulVec_mem #[matrixBody.proofBody, vectorBody.proofBody]⟩
 
-@[inclusionExt‖(_ : Fin _ → ℝ)‖]
+@[inclusionExt matrix.vector | ‖(_ : Fin _ → ℝ)‖]
 meta def evalVectorNorm : InclusionExt where
-  family := `matrix.vector
   derive e := do
     let x ← lastUnaryArg e
     let some _ ← vectorSize? (← inferType x) | failure
@@ -340,9 +333,8 @@ meta def evalVectorNorm : InclusionExt where
     return ⟨← mkAppM ``VectorBox.norm #[body.inclusionBody],
       ← mkAppM ``vector_norm_mem #[body.proofBody]⟩
 
-@[inclusionExt(_ : Fin _ → ℝ)]
+@[inclusionExt matrix.vector | (_ : Fin _ → ℝ)]
 meta def evalVectorIVar : InclusionExt where
-  family := `matrix.vector
   priority := eval_prio high
   derive e := do
     let eType ← inferType e
@@ -352,9 +344,8 @@ meta def evalVectorIVar : InclusionExt where
     let iVar ← mkIVar e setType toSetInst
     return iVar.toExprInclusionBody
 
-@[inclusionExt(_ : Matrix (Fin _) (Fin _) ℝ)]
+@[inclusionExt matrix.vector | (_ : Matrix (Fin _) (Fin _) ℝ)]
 meta def evalMatrixIVar : InclusionExt where
-  family := `matrix.vector
   priority := eval_prio high
   derive e := do
     let eType ← inferType e
@@ -372,36 +363,24 @@ meta def closedBallArgs? (type : Expr) : MetaM (Option (Expr × Expr × Expr)) :
 
 meta def deriveClosedBallHyp (h type : Expr) : HypothesisM Unit := do
   let some (x, center, radius) ← closedBallArgs? type | failure
-  let some { expr, iType } ← requestedIVar? x | return
+  let some iExpr ← requestedIVar? x | return
   let (hull, hullMem) ←
-    match iType.setType.getAppFnArgs with
+    match iExpr.iType.setType.getAppFnArgs with
     | (``VectorBox, #[_]) => pure (``VectorBox.closedBallHull, ``vector_closedBallHull_mem)
     | (``MatrixBox, #[_, _]) => pure (``MatrixBox.closedBallHull, ``matrix_closedBallHull_mem)
     | _ => failure
-  let centerFn ← mkHypInclusionFunction center iType
+  let centerBody ← mkHypInclusionBody center iExpr.iType
   let radiusSetType ← mkAppM ``Interval #[mkConst ``Dyadic]
   let radiusToSet ← synthInstance
     (← mkAppM ``ToSet #[radiusSetType, mkConst ``Real])
   let radiusType : IType := ⟨mkConst ``Real, radiusSetType, radiusToSet⟩
-  let radiusFn ← mkHypInclusionFunction radius radiusType
-  let (params, argIndices) :=
-    mergeInclusionParams #[centerFn.params, radiusFn.params]
-  let hyp ← withInclusionParams params fun paramVars => do
-    let centerArgs := argIndices[0]!.map fun i => paramVars[i]!
-    let radiusArgs := argIndices[1]!.map fun i => paramVars[i]!
-    let centerSet := (mkAppN centerFn.inclusion centerArgs).headBeta
-    let centerProof := (mkAppN centerFn.proof centerArgs).headBeta
-    let radiusSet := (mkAppN radiusFn.inclusion radiusArgs).headBeta
-    let radiusProof := (mkAppN radiusFn.proof radiusArgs).headBeta
-    let set ← mkAppM hull #[centerSet, radiusSet]
-    let proof ← mkAppM hullMem #[centerProof, radiusProof, h]
-    return ⟨params, #[], iType,
-      ← mkLambdaFVars paramVars set, ← mkLambdaFVars paramVars proof⟩
-  addInclusionHypResult ⟨expr, hyp⟩
+  let radiusBody ← mkHypInclusionBody radius radiusType
+  let set ← mkAppM hull #[centerBody.inclusionBody, radiusBody.inclusionBody]
+  let proof ← mkAppM hullMem #[centerBody.proofBody, radiusBody.proofBody, h]
+  addInclusionHyp iExpr ⟨set, proof⟩
 
-@[hypothesisExt _ ∈ Metric.closedBall _ _]
+@[hypothesisExt matrix.vector | _ ∈ Metric.closedBall _ _]
 meta def evalClosedBallHyp : HypothesisExt where
-  family := `matrix.vector
   derive := deriveClosedBallHyp
 
 end Inclusion.MatrixVector

@@ -16,12 +16,12 @@ set_option inclusion.large.precision 112 in
     |(2 * Real.sqrt 2 / 9801 *
       ∑ k ∈ Finset.range 4, ramanujanSummand k) - 1 / Real.pi| <
         0.000000000000000000000000000001 := by
-  inclusion
+  inclusion [core, real.dyadic]
 
 set_option inclusion.large.precision 112 in
 #time_with_kernel theorem gaussian_integral_30_digits :
     |gaussianIntegral - 0.746824132812427025399467436132| <
       0.000000000000000000000000000001 := by
-  inclusion
+  inclusion [core, real.dyadic]
 
 end Inclusion.Experimental.HighPrecision.Tests

@@ -2,7 +2,7 @@ module
 
 public import Mathlib.Tactic.Inclusion.Extension.Interval
 public import Mathlib.Tactic.Inclusion.Extension.Dyadic
-public meta import Mathlib.Tactic.Inclusion.Core.Elab
+public meta import Mathlib.Tactic.Inclusion.Extension.Families
 public meta import Mathlib.Tactic.Inclusion.Core.ExtensionAPI
 public import Mathlib.Tactic.Inclusion.Extension.Splitter
 public import Mathlib.Algebra.Order.Field.Basic
@@ -532,49 +532,38 @@ inductive HypKind
   | downward
   | upward
 
-meta def mkHypResult (expr endpoint h : Expr) (iVarType : IType)
-    (kind : HypKind) : HypothesisM InclusionHypResult := do
-  let fn ← mkHypInclusionFunction endpoint iVarType
-  let hyp ← withInclusionParams fn.params fun paramVars => do
-    let set := (mkAppN fn.inclusion paramVars).headBeta
-    let endpointMem := (mkAppN fn.proof paramVars).headBeta
-    let (set, proof) ← match kind with
-      | .eqLeft => pure (set, ← mkAppM ``ToSet.mem_of_eq_of_mem #[h, endpointMem])
-      | .eqRight => pure (set, ← mkAppM ``ToSet.mem_of_mem_of_eq #[h, endpointMem])
-      | .downward =>
-          pure (← mkAppM ``Interval.downwardClosure #[set],
-            ← mkAppM ``downwardClosure_mem #[h, endpointMem])
-      | .upward =>
-          pure (← mkAppM ``Interval.upwardClosure #[set],
-            ← mkAppM ``upwardClosure_mem #[h, endpointMem])
-    return ⟨fn.params, #[], iVarType,
-      ← mkLambdaFVars paramVars set, ← mkLambdaFVars paramVars proof⟩
-  return ⟨expr, hyp⟩
+meta def mkHypBody (endpoint h : Expr) (iExpr : IExpr)
+    (kind : HypKind) : HypothesisM ExprInclusionBody := do
+  let endpointBody ← mkHypInclusionBody endpoint iExpr.iType
+  let set := endpointBody.inclusionBody
+  let endpointMem := endpointBody.proofBody
+  match kind with
+  | .eqLeft => return ⟨set, ← mkAppM ``ToSet.mem_of_eq_of_mem #[h, endpointMem]⟩
+  | .eqRight => return ⟨set, ← mkAppM ``ToSet.mem_of_mem_of_eq #[h, endpointMem]⟩
+  | .downward => return ⟨← mkAppM ``Interval.downwardClosure #[set],
+      ← mkAppM ``downwardClosure_mem #[h, endpointMem]⟩
+  | .upward => return ⟨← mkAppM ``Interval.upwardClosure #[set],
+      ← mkAppM ``upwardClosure_mem #[h, endpointMem]⟩
 
-meta def tryHypResult (expr endpoint h : Expr) (iVarType : IType)
-    (kind : HypKind) : HypothesisM (Option InclusionHypResult) := do
+meta def tryHyp (iExpr : IExpr) (endpoint h : Expr) (kind : HypKind) : HypothesisM Unit := do
   let saved ← saveState
   try
-    return some (← mkHypResult expr endpoint h iVarType kind)
+    addInclusionHyp iExpr (← mkHypBody endpoint h iExpr kind)
   catch err =>
-    trace[Tactic.inclusion] "Could not derive an inclusion hypothesis for {expr} from \
+    trace[Tactic.inclusion] "Could not derive an inclusion hypothesis for {iExpr.expr} from \
       {← inferType h} : \
       {err.toMessageData}"
     restoreState saved
-    return none
 
 meta def deriveEqualityHyp (h type : Expr) : HypothesisM Unit := do
   let (``Eq, #[_, left, right]) := (← whnfR type).getAppFnArgs | failure
-  if let some { expr, iType } ← requestedIVar? left then
-    if let some result ← tryHypResult expr right h iType .eqLeft then
-      addInclusionHypResult result
-  if let some { expr, iType } ← requestedIVar? right then
-    if let some result ← tryHypResult expr left h iType .eqRight then
-      addInclusionHypResult result
+  if let some iExpr ← requestedIVar? left then
+    tryHyp iExpr right h .eqLeft
+  if let some iExpr ← requestedIVar? right then
+    tryHyp iExpr left h .eqRight
 
-@[hypothesisExt _ = _]
+@[hypothesisExt core | _ = _]
 meta def evalEqualityHyp : HypothesisExt where
-  family := `core
   derive := deriveEqualityHyp
 
 meta def deriveRealOrderHyp (h type : Expr) : HypothesisM Unit := do
@@ -583,16 +572,13 @@ meta def deriveRealOrderHyp (h type : Expr) : HypothesisM Unit := do
   unless relation == ``LE.le || relation == ``LT.lt do failure
   unless ← isDefEq α (mkConst ``Real) do failure
   let hle ← if relation == ``LT.lt then mkAppM ``le_of_lt #[h] else pure h
-  if let some { expr, iType } ← requestedIVar? left then
-    if let some result ← tryHypResult expr right hle iType .downward then
-      addInclusionHypResult result
-  if let some { expr, iType } ← requestedIVar? right then
-    if let some result ← tryHypResult expr left hle iType .upward then
-      addInclusionHypResult result
+  if let some iExpr ← requestedIVar? left then
+    tryHyp iExpr right hle .downward
+  if let some iExpr ← requestedIVar? right then
+    tryHyp iExpr left hle .upward
 
-@[hypothesisExt(_ : ℝ) ≤ (_ : ℝ), (_ : ℝ) < (_ : ℝ)]
+@[hypothesisExt real.dyadic | (_ : ℝ) ≤ (_ : ℝ), (_ : ℝ) < (_ : ℝ)]
 meta def evalRealOrderHyp : HypothesisExt where
-  family := `real.dyadic
   derive := deriveRealOrderHyp
 
 meta def deriveSetIntervalHyp (h type : Expr) : HypothesisM Unit := do
@@ -623,48 +609,40 @@ meta def deriveSetIntervalHyp (h type : Expr) : HypothesisM Unit := do
   for inequality in inequalities do
     deriveRealOrderHyp inequality (← instantiateMVars (← inferType inequality))
 
-@[hypothesisExt(_ : ℝ) ∈ (_ : Set ℝ)]
+@[hypothesisExt real.dyadic | (_ : ℝ) ∈ (_ : Set ℝ)]
 meta def evalSetIntervalHyp : HypothesisExt where
-  family := `real.dyadic
   derive := deriveSetIntervalHyp
 
-@[inclusionExt OfNat.ofNat _]
+@[inclusionExt real.dyadic | OfNat.ofNat _]
 meta def evalOfNat : InclusionExt where
-  family := `real.dyadic
   derive e := do
     let (``OfNat.ofNat, #[α, n, _]) := e.getAppFnArgs | failure
     unless ← isDefEq α (mkConst ``Real) do failure
     guard n.isRawNatLit
     return ⟨← mkAppM ``ofNat #[n], ← mkAppM ``ofNat_mem #[n]⟩
 
-@[inclusionExt Neg.neg _]
+@[inclusionExt real.dyadic | Neg.neg _]
 meta def evalNeg : InclusionExt where
-  family := `real.dyadic
   derive e := evalUnary e ``neg ``neg_mem
 
-@[inclusionExt _ + _]
+@[inclusionExt real.dyadic | _ + _]
 meta def evalAdd : InclusionExt where
-  family := `real.dyadic
   derive e := evalBinary e ``add ``add_mem
 
-@[inclusionExt _ - _]
+@[inclusionExt real.dyadic | _ - _]
 meta def evalSub : InclusionExt where
-  family := `real.dyadic
   derive e := evalBinary e ``sub ``sub_mem
 
-@[inclusionExt _ * _]
+@[inclusionExt real.dyadic | _ * _]
 meta def evalMul : InclusionExt where
-  family := `real.dyadic
   derive e := evalBinary e ``mul ``mul_mem
 
-@[inclusionExt _ / _]
+@[inclusionExt real.dyadic | _ / _]
 meta def evalDiv : InclusionExt where
-  family := `real.dyadic
   derive e := evalBinary e ``div ``div_mem
 
-@[inclusionExt(_ : ℝ) ≤ (_ : ℝ)]
+@[inclusionExt real.dyadic | (_ : ℝ) ≤ (_ : ℝ)]
 meta def evalLe : InclusionExt where
-  family := `real.dyadic
   derive e := do
     let (``LE.le, #[_, _, a, b]) := e.getAppFnArgs | failure
     unless ← isDefEq (← inferType a) (mkConst ``Real) do failure
@@ -675,9 +653,8 @@ meta def evalLe : InclusionExt where
     return ⟨← mkAppM ``le #[left.inclusionBody, right.inclusionBody],
       ← mkAppM ``le_mem #[left.proofBody, right.proofBody]⟩
 
-@[inclusionExt intervalIntegral (_ : ℝ → ℝ) _ _ volume]
+@[inclusionExt real.dyadic | intervalIntegral (_ : ℝ → ℝ) _ _ volume]
 meta def evalUnitIntegral : InclusionExt where
-  family := `real.dyadic
   derive e := do
     let (``intervalIntegral, #[E, _, _, f, a, b, _]) := e.getAppFnArgs | failure
     unless ← isDefEq E (mkConst ``Real) do failure
@@ -702,9 +679,8 @@ meta def evalUnitIntegral : InclusionExt where
           return ⟨← mkAppM ``unitIntegral #[intervalFn],
             ← mkAppM ``unitIntegral_mem #[intervalFn, continuousProof, proofFn]⟩
 
-@[inclusionExt(_ : ℝ)]
+@[inclusionExt real.dyadic | (_ : ℝ)]
 meta def evalRealIVar : InclusionExt where
-  family := `real.dyadic
   priority := eval_prio high
   derive e := do
     unless ← isDefEq (← inferType e) (mkConst ``Real) do failure
