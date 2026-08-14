@@ -16,7 +16,7 @@ This file defines the environment extensions used in the `inclusion` tactic.
 
 public meta section
 
-open Lean Meta Elab Term DiscrTreeExt
+open Lean Meta DiscrTreeExt
 
 namespace Inclusion
 
@@ -34,101 +34,62 @@ structure HypothesisExt where
 
 /-- A named family of inclusion and hypothesis extensions. -/
 structure InclusionFamily where
+  ref : Name
   inclusionExt : EnvExt InclusionExt
   hypothesisExt : EnvExt HypothesisExt
   deriving Nonempty
 
-abbrev InclusionFamilyMap := Std.HashMap Name InclusionFamily
+abbrev InclusionFamilies := Std.HashMap Name InclusionFamily
 
-initialize inclusionFamilyMapRef : IO.Ref InclusionFamilyMap ← IO.mkRef {}
+initialize inclusionFamiliesRef : IO.Ref InclusionFamilies ← IO.mkRef {}
 
 /-- Register an inclusion family containing a separate inclusion and hypothesis extension. -/
 def registerInclusionFamily (name : Name) (ref : Name := by exact decl_name%) :
     IO InclusionFamily := do
-  if (← inclusionFamilyMapRef.get).contains name then
+  if (← inclusionFamiliesRef.get).contains name then
     throw <| IO.userError s!"Inclusion family '{name}' is already registered"
-  let inclusionExt ←
-    (initializeEnvExt ``InclusionExt (Name.str ref "inclusionExt") : IO (EnvExt InclusionExt))
-  let hypothesisExt ←
-    (initializeEnvExt ``HypothesisExt (Name.str ref "hypothesisExt") :
-      IO (EnvExt HypothesisExt))
-  let family := { inclusionExt, hypothesisExt }
-  inclusionFamilyMapRef.modify (·.insert name family)
+  let inclusionExt ← initializeEnvExt ``InclusionExt (ref.str "inclusionExt")
+  let hypothesisExt ← initializeEnvExt ``HypothesisExt (ref.str "hypothesisExt")
+  let family := { ref, inclusionExt, hypothesisExt }
+  inclusionFamiliesRef.modify (·.insert name family)
   return family
 
 /-- Return the registered inclusion family named `name`. -/
 def getInclusionFamily? (name : Name) : CoreM (Option InclusionFamily) := do
-  let family? := (← inclusionFamilyMapRef.get)[name]?
+  let family? := (← inclusionFamiliesRef.get)[name]?
   if let some family := family? then
-    recordExtraModUseFromDecl (isMeta := true) family.inclusionExt.ext.name
-    recordExtraModUseFromDecl (isMeta := true) family.hypothesisExt.ext.name
+    recordExtraModUseFromDecl (isMeta := true) family.ref
   return family?
 
-private def getInclusionFamily (name : Name) : CoreM InclusionFamily := do
+/-- Return the registered inclusion family named `name`, or fail if it is not registered. -/
+def getInclusionFamily (name : Name) : CoreM InclusionFamily := do
   let some family ← getInclusionFamily? name
     | throwError "Unknown inclusion family '{name}'"
   return family
 
-initialize
-  discard <| registerInclusionFamily `core
-
-syntax (name := inclusionExtAttr) "inclusionExt " ident " | " term,+ : attr
-
-/-- The `inclusionExt` attribute registers an inclusion-function extension. -/
-initialize registerBuiltinAttribute {
-  name := `inclusionExtAttr
-  descr := "adds an inclusion-function extension"
-  applicationTime := .afterCompilation
-  add := fun declName stx kind => match stx with
-    | `(attr| inclusionExt $familyName:ident | $es,*) => do
-      let family ← getInclusionFamily familyName.getId
-      addDecl `inclusionExt family.inclusionExt ``InclusionExt declName
-        (es.getElems.map (·.raw)) kind
-    | _ => throwUnsupportedSyntax
-  erase := fun _ => throwError "Inclusion extensions cannot be erased by declaration"
-}
-
-syntax (name := hypothesisExtAttr) "hypothesisExt " ident " | " term,+ : attr
-
-/-- The `hypothesisExt` attribute registers a hypothesis extension. -/
-initialize registerBuiltinAttribute {
-  name := `hypothesisExtAttr
-  descr := "adds a hypothesis extension"
-  applicationTime := .afterCompilation
-  add := fun declName stx kind => match stx with
-    | `(attr| hypothesisExt $familyName:ident | $es,*) => do
-      let family ← getInclusionFamily familyName.getId
-      addDecl `hypothesisExt family.hypothesisExt ``HypothesisExt declName
-        (es.getElems.map (·.raw)) kind
-    | _ => throwUnsupportedSyntax
-  erase := fun _ => throwError "Hypothesis extensions cannot be erased by declaration"
-}
-
-private def getFamilyMatches {α : Type} (familyNames : Array Name) (e : Expr)
-    (getExt : InclusionFamily → EnvExt α) : MetaM (Array (Name × α)) := do
+private def getExtMatches {α β γ : Type}
+    (extType : InclusionFamily → ScopedEnvExtension β γ (DiscrTreeExt.State α))
+    (priority : α → Nat)
+    (families : Array Name) (e : Expr) :
+    MetaM (Array (Name × α)) := do
   let env ← getEnv
   let mut matched := #[]
-  for familyName in familyNames do
+  for familyName in families do
     let family ← getInclusionFamily familyName
-    for ext in ← (getExt family).getState env |>.getMatch e do
+    let extState := (extType family).getState env
+    for ext in ← extState.getMatch e do
       matched := matched.push (familyName, ext)
-  return matched
+  return matched.qsort fun (_, a) (_, b) => priority a > priority b
 
-private def getSortedFamilyMatches {α : Type} (familyNames : Array Name) (e : Expr)
-    (getExt : InclusionFamily → EnvExt α) (priority : α → Nat) :
-    MetaM (Array (Name × α)) := do
-  return (← getFamilyMatches familyNames e getExt).qsort fun a b =>
-    priority a.2 < priority b.2
-
-/-- Return the matching inclusion extensions in the enabled families, ordered by priority. -/
+/-- Return the matching inclusion extensions in the enabled families, highest priority first. -/
 def getInclusionExtMatches (families : Array Name) (e : Expr) :
     MetaM (Array (Name × InclusionExt)) :=
-  getSortedFamilyMatches families e (·.inclusionExt) (·.priority)
+  getExtMatches InclusionFamily.inclusionExt InclusionExt.priority families e
 
-/-- Return the matching hypothesis extensions in the enabled families, ordered by priority. -/
+/-- Return the matching hypothesis extensions in the enabled families, highest priority first. -/
 def getHypothesisExtMatches (families : Array Name) (e : Expr) :
     MetaM (Array (Name × HypothesisExt)) :=
-  getSortedFamilyMatches families e (·.hypothesisExt) (·.priority)
+  getExtMatches InclusionFamily.hypothesisExt HypothesisExt.priority families e
 
 section InclusionParam
 
@@ -156,26 +117,6 @@ initialize inclusionParamExt :
     addEntry := fun state (_, decl) =>
       { state with decls := state.decls.insert decl.name decl }
   }
-
-syntax (name := inclusionParamAttr) "inclusionParam" : attr
-
-/-- The `inclusionParam` attribute registers a named natural-number inclusion parameter. -/
-initialize registerBuiltinAttribute {
-  name := `inclusionParamAttr
-  descr := "registers an inclusion-tactic parameter"
-  applicationTime := .afterCompilation
-  add := fun declName _ kind => do
-    let env ← getEnv
-    ensureAttrDeclIsMeta `inclusionParam declName kind
-    unless (env.getModuleIdxFor? declName).isNone do
-      throwError "invalid attribute `inclusionParam`, declaration is in an imported module"
-    if (IR.getSorryDep env declName).isSome then return
-    let decl ← mkInclusionParamDecl declName
-    let params := inclusionParamExt.getState env
-    if params.decls.contains decl.name then
-      throwError "Inclusion parameter '{decl.name}' is already registered"
-    inclusionParamExt.add (declName, decl) kind
-}
 
 end InclusionParam
 

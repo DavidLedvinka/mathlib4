@@ -65,6 +65,7 @@ public initialize allowedRef : IO.Ref (Std.HashSet SyntaxNodeKind) ←
     `Mathlib.Tactic.ExtractGoal.extractGoal,
     `Lean.Parser.Tactic.traceState,
     `Mathlib.Tactic.tacticMatch_target_,
+    `Inclusion.inclusion?,
     `change?,
     `«tactic#adaptation_note_»,
     `tacticSleep_heartbeats_,

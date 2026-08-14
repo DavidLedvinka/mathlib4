@@ -72,20 +72,16 @@ class ConcreteIntervalCover (x : ℝ) where
   cover : (source : Set ℝ) ⊆ ⋃ t ∈ pieces, (t : Set ℝ)
 
 @[inclusionExt real.concrete | (_ : ℝ)]
-meta def evalConcreteIntervalIVar : InclusionExt where
-  priority := 0
-  derive e := do
-    unless ← isDefEq (← inferType e) (mkConst ``Real) do failure
-    let configType ← mkAppM ``ConcreteIntervalCover #[e]
-    let config ← instantiateMVars (← whnf (← synthInstance configType))
-    let (``ConcreteIntervalCover.mk, #[_, source, pieces, hcover]) := config.getAppFnArgs
-      | failure
-    let setType ← mkAppM ``Interval #[mkConst ``Dyadic]
-    let toSetInst ← synthInstance (← mkAppM ``ToSet #[setType, mkConst ``Real])
-    let cover ← mkAppM' (mkConst ``Cover.ofArray [.zero, .zero, .zero])
-      #[source, pieces, hcover]
-    let iVar ← mkIVar e setType toSetInst (some cover)
-    return iVar.toExprInclusionBody
+meta def mkConcreteIntervalIVar : InclusionExt :=
+  mkNDIVarExt (mkConst ``Real) (mkAppM ``Interval #[mkConst ``Dyadic])
+    (fun iExpr => do
+      let configType ← mkAppM ``ConcreteIntervalCover #[iExpr.expr]
+      let config ← instantiateMVars (← whnf (← synthInstance configType))
+      let (``ConcreteIntervalCover.mk, #[_, source, pieces, hcover]) := config.getAppFnArgs
+        | failure
+      return some (← mkAppM' (mkConst ``Cover.ofArray [.zero, .zero, .zero])
+        #[source, pieces, hcover]))
+    (priority := eval_prio high)
 
 syntax (name := inclusionCover) "inclusion_cover " term " in " term " with " term
   " using " term : tactic

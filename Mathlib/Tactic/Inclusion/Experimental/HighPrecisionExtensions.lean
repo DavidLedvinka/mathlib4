@@ -2,6 +2,8 @@ module
 
 public import Mathlib.Tactic.Inclusion.Experimental.LargeExtensions
 public meta import Mathlib.Tactic.Inclusion.Experimental.LargeExtensions
+public import Mathlib.Tactic.Inclusion.Experimental.Sum
+public import Mathlib.MeasureTheory.Integral.IntervalIntegral.Basic
 
 set_option linter.style.header false
 
@@ -127,9 +129,9 @@ theorem gaussianIntegral_mem (prec : ℕ) :
 
 @[inclusionExt real.dyadic | _ / _]
 meta def evalDiv : InclusionExt where
-  priority := 0
+  priority := eval_prio high
   derive e := do
-    let (a, b) ← Inclusion.realBinaryArgs e
+    let (a, b) ← Large.binaryArgs e
     let left ← mkExprInclusionBody a
     let right ← mkExprInclusionBody b
     let prec ← Large.precisionExpr
@@ -138,7 +140,7 @@ meta def evalDiv : InclusionExt where
 
 @[inclusionExt real.dyadic | _ ^ (_ : ℤ)]
 meta def evalZPow : InclusionExt where
-  priority := 0
+  priority := eval_prio high
   derive e := do
     let (``HPow.hPow, #[α, β, γ, _, x, n]) := e.getAppFnArgs | failure
     unless ← isDefEq α (mkConst ``Real) do failure
@@ -152,7 +154,7 @@ meta def evalZPow : InclusionExt where
 @[inclusionExt real.dyadic | |(_ : ℝ)|]
 meta def evalAbs : InclusionExt where
   derive e := do
-    let body ← mkExprInclusionBody (← Inclusion.realUnaryArg e)
+    let body ← mkExprInclusionBody (← Large.unaryArg e)
     return ⟨← mkAppM ``absInterval #[body.inclusionBody],
       ← mkAppM ``abs_mem #[body.proofBody]⟩
 
@@ -166,7 +168,7 @@ meta def evalRamanujanSummand : InclusionExt where
 
 @[inclusionExt real.dyadic | Nat.cast _]
 meta def evalNatCast : InclusionExt where
-  priority := 0
+  priority := eval_prio high
   derive e := do
     let (``Nat.cast, #[α, _, n]) := e.getAppFnArgs | failure
     unless ← isDefEq α (mkConst ``Real) do failure
@@ -197,7 +199,7 @@ meta def evalGaussianIntegral : InclusionExt where
 
 @[inclusionExt real.dyadic | intervalIntegral (_ : ℝ → ℝ) _ _ volume]
 meta def evalGaussianIntegralExpr : InclusionExt where
-  priority := 0
+  priority := eval_prio high
   derive e := do
     unless ← isDefEq e (mkConst ``gaussianIntegral) do failure
     let prec ← Large.precisionExpr

@@ -1,5 +1,6 @@
 module
 
+public import Mathlib.Tactic.Inclusion.Experimental.DyadicRealOperations
 public import Mathlib.Tactic.Inclusion.Extension.Extensions
 public meta import Mathlib.Tactic.Inclusion.Extension.Extensions
 public meta import Mathlib.Tactic.Inclusion.Experimental.Families
@@ -334,26 +335,16 @@ meta def evalVectorNorm : InclusionExt where
       ← mkAppM ``vector_norm_mem #[body.proofBody]⟩
 
 @[inclusionExt matrix.vector | (_ : Fin _ → ℝ)]
-meta def evalVectorIVar : InclusionExt where
-  priority := eval_prio high
-  derive e := do
-    let eType ← inferType e
-    let some n ← vectorSize? eType | failure
-    let setType ← mkAppM ``VectorBox #[n]
-    let toSetInst ← synthInstance (← mkAppM ``ToSet #[setType, eType])
-    let iVar ← mkIVar e setType toSetInst
-    return iVar.toExprInclusionBody
+meta def evalVectorIVar : InclusionExt :=
+  mkIVarExt fun elemType => do
+    let some n ← vectorSize? elemType | failure
+    mkAppM ``VectorBox #[n]
 
 @[inclusionExt matrix.vector | (_ : Matrix (Fin _) (Fin _) ℝ)]
-meta def evalMatrixIVar : InclusionExt where
-  priority := eval_prio high
-  derive e := do
-    let eType ← inferType e
-    let some (m, n) ← matrixSizes? eType | failure
-    let setType ← mkAppM ``MatrixBox #[m, n]
-    let toSetInst ← synthInstance (← mkAppM ``ToSet #[setType, eType])
-    let iVar ← mkIVar e setType toSetInst
-    return iVar.toExprInclusionBody
+meta def evalMatrixIVar : InclusionExt :=
+  mkIVarExt fun elemType => do
+    let some (m, n) ← matrixSizes? elemType | failure
+    mkAppM ``MatrixBox #[m, n]
 
 meta def closedBallArgs? (type : Expr) : MetaM (Option (Expr × Expr × Expr)) := do
   let (``Membership.mem, #[_, _, _, set, x]) := (← whnfR type).getAppFnArgs | return none

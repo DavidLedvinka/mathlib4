@@ -32,6 +32,18 @@ def InclusionConfig.enabledParams (config : InclusionConfig) : NameSet :=
 def compileInclusionCheck (inclusionExpr : Expr) : MetaM IntervalBool :=
   unsafe evalExpr IntervalBool (mkConst ``IntervalBool) inclusionExpr
 
+def ExprInclusion.resolveParamValues (exprInclusion : ExprInclusion) (paramValues : NameMap Nat) :
+    MetaM (Array Nat) := do
+  let paramExts := inclusionParamExt.getState (← getEnv)
+  exprInclusion.params.mapM fun name => do
+    if let some value := paramValues.find? name then
+      return value
+    let some paramExt := paramExts.find? name
+      | throwError "Unknown inclusion parameter '{name}'"
+    let some value := paramExt.defaultValue
+      | throwError "No value was supplied for inclusion parameter '{name}'"
+    return value
+
 def mkInclusionTrueProof (inclusionExpr : Expr) : MetaM Expr := do
   match ← compileInclusionCheck inclusionExpr with
   | .true => return mkIntervalBoolRefl inclusionExpr
@@ -61,15 +73,7 @@ def inclusionCore (goal : Expr) (config : InclusionConfig) : MetaM Expr := do
   unless ← isProp goal do
     throwError "The goal is not a proposition"
   let exprInclusion ← (toExprInclusion goal).run config.enabledParams config.families
-  let paramExts := inclusionParamExt.getState (← getEnv)
-  let paramValues ← exprInclusion.params.mapM fun name => do
-    if let some value := config.paramValues.find? name then
-      return value
-    let some paramExt := paramExts.find? name
-      | throwError "Unknown inclusion parameter '{name}'"
-    let some value := paramExt.defaultValue
-      | throwError "No value was supplied for inclusion parameter '{name}'"
-    return value
+  let paramValues ← exprInclusion.resolveParamValues config.paramValues
   let paramExprs := paramValues.map mkNatLit
   let inclusionExpr := mkAppN exprInclusion.inclusion paramExprs
   let inclusionProof ←

@@ -1,5 +1,6 @@
 module
 
+public import Mathlib.Tactic.Inclusion.Experimental.DyadicRealOperations
 public import Mathlib.Tactic.Inclusion.Extension.Extensions
 public meta import Mathlib.Tactic.Inclusion.Extension.Extensions
 public meta import Mathlib.Tactic.Inclusion.Experimental.Families
@@ -236,14 +237,8 @@ meta def evalAbs : InclusionExt where
       ← mkAppM ``abs_mem #[body.proofBody]⟩
 
 @[inclusionExt complex.ball | (_ : ℂ)]
-meta def evalIVar : InclusionExt where
-  priority := eval_prio high
-  derive e := do
-    unless ← isDefEq (← inferType e) (mkConst ``Complex) do failure
-    let setType := mkConst ``Ball
-    let toSetInst ← synthInstance (← mkAppM ``ToSet #[setType, mkConst ``Complex])
-    let iVar ← mkIVar e setType toSetInst
-    return iVar.toExprInclusionBody
+meta def mkComplexIVar : InclusionExt :=
+  mkNDIVarExt (mkConst ``Complex) (pure (mkConst ``Ball))
 
 meta def closedBallArgs? (type : Expr) : MetaM (Option (Expr × Expr × Expr)) := do
   let (``Membership.mem, #[_, _, _, set, z]) := (← whnfR type).getAppFnArgs | return none

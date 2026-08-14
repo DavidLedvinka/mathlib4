@@ -1,5 +1,6 @@
 module
 
+public import Mathlib.Tactic.Inclusion.Experimental.DyadicRealOperations
 public import Mathlib.Tactic.Inclusion.Extension.Extensions
 public import Mathlib.Analysis.SpecialFunctions.Log.Basic
 public import Mathlib.Analysis.SpecialFunctions.Trigonometric.Basic
@@ -438,9 +439,29 @@ end Pi
 meta def precisionExpr : InclusionM Expr := do
   return mkNatLit <| inclusion.large.precision.get (← getOptions)
 
+meta def unaryArg (e : Expr) : InclusionM Expr := do
+  let .app _ a ← whnfR e | failure
+  unless ← isDefEq (← inferType a) (mkConst ``Real) do failure
+  unless ← isDefEq (← inferType e) (mkConst ``Real) do failure
+  return a
+
+meta def binaryArgs (e : Expr) : InclusionM (Expr × Expr) := do
+  let .app (.app _ a) b ← whnfR e | failure
+  unless ← isDefEq (← inferType a) (mkConst ``Real) do failure
+  unless ← isDefEq (← inferType b) (mkConst ``Real) do failure
+  unless ← isDefEq (← inferType e) (mkConst ``Real) do failure
+  return (a, b)
+
+private meta def deriveBinary (e : Expr) (op inclusion : Name) : InclusionM ExprInclusionBody := do
+  let (a, b) ← binaryArgs e
+  let left ← mkExprInclusionBody a
+  let right ← mkExprInclusionBody b
+  return ⟨← mkAppM op #[left.inclusionBody, right.inclusionBody],
+    ← mkAppM inclusion #[left.proofBody, right.proofBody]⟩
+
 @[inclusionExt real.dyadic | OfNat.ofNat _]
 meta def evalOfNat : InclusionExt where
-  priority := 0
+  priority := eval_prio high
   derive e := do
     let (``OfNat.ofNat, #[alpha, n, _]) := e.getAppFnArgs | failure
     unless ← isDefEq alpha (mkConst ``Real) do failure
@@ -449,18 +470,18 @@ meta def evalOfNat : InclusionExt where
 
 @[inclusionExt real.dyadic | _ + _]
 meta def evalAdd : InclusionExt where
-  priority := 0
-  derive e := Inclusion.evalBinary e ``add ``add_mem
+  priority := eval_prio high
+  derive e := deriveBinary e ``add ``add_mem
 
 @[inclusionExt real.dyadic | _ - _]
 meta def evalSub : InclusionExt where
-  priority := 0
-  derive e := Inclusion.evalBinary e ``sub ``sub_mem
+  priority := eval_prio high
+  derive e := deriveBinary e ``sub ``sub_mem
 
 @[inclusionExt real.dyadic | _ * _]
 meta def evalMul : InclusionExt where
-  priority := 0
-  derive e := Inclusion.evalBinary e ``mul ``mul_mem
+  priority := eval_prio high
+  derive e := deriveBinary e ``mul ``mul_mem
 
 @[inclusionExt real.dyadic | OfScientific.ofScientific _ _ _]
 meta def evalScientific : InclusionExt where
@@ -485,7 +506,7 @@ meta def evalPow : InclusionExt where
 @[inclusionExt real.dyadic | Real.sqrt _]
 meta def evalSqrt : InclusionExt where
   derive e := do
-    let body ← mkExprInclusionBody (← realUnaryArg e)
+    let body ← mkExprInclusionBody (← unaryArg e)
     let prec ← precisionExpr
     return ⟨← mkAppM ``sqrt #[prec, body.inclusionBody],
       ← mkAppM ``sqrt_mem #[prec, body.proofBody]⟩
@@ -493,7 +514,7 @@ meta def evalSqrt : InclusionExt where
 @[inclusionExt real.dyadic | Real.exp _]
 meta def evalExp : InclusionExt where
   derive e := do
-    let body ← mkExprInclusionBody (← realUnaryArg e)
+    let body ← mkExprInclusionBody (← unaryArg e)
     let prec ← precisionExpr
     return ⟨← mkAppM ``exp #[prec, body.inclusionBody],
       ← mkAppM ``exp_mem #[prec, body.proofBody]⟩

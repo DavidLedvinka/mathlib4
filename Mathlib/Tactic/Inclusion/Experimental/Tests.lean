@@ -1,7 +1,9 @@
 module
 
+public import Mathlib.Tactic.Inclusion.Experimental.DyadicRealOperations
 public import Mathlib.Tactic.Inclusion.Extension.Extensions
 public meta import Mathlib.Tactic.Inclusion.Extension.Extensions
+public meta import Mathlib.Tactic.Inclusion.Experimental.Integral
 public meta import Mathlib.Tactic.Inclusion.Experimental.Families
 
 set_option linter.style.header false
@@ -53,16 +55,20 @@ meta def evalFamilyValueOther : InclusionExt where
 inductive FamilyUpperBound (x : ℝ) : Prop where
   | intro (h : x ≤ 1)
 
-theorem FamilyUpperBound.le {x : ℝ} (h : FamilyUpperBound x) : x ≤ 1 := by
-  cases h with
-  | intro h => exact h
+@[hypothesisOp test.hypothesis]
+theorem FamilyUpperBound.mem {x : ℝ} (h : FamilyUpperBound x) :
+    x ∈ (Inclusion.ofNat 1).downwardClosure := by
+  rcases h with ⟨hx⟩
+  exact downwardClosure_mem hx (Inclusion.ofNat_mem 1)
 
-@[hypothesisExt test.hypothesis | FamilyUpperBound _]
-meta def evalFamilyUpperBound : HypothesisExt where
-  derive h type := do
-    let (``FamilyUpperBound, #[_]) := type.getAppFnArgs | failure
-    let hle ← mkAppM ``FamilyUpperBound.le #[h]
-    deriveRealOrderHyp hle (← inferType hle)
+inductive IsSum (z x y : ℝ) : Prop where
+  | intro (h : z = x + y)
+
+@[hypothesisOp test.hypothesis]
+theorem IsSum.mem {z x y : ℝ} {I J : Interval Dyadic}
+    (h : IsSum z x y) (hx : x ∈ I) (hy : y ∈ J) : z ∈ Inclusion.add I J := by
+  obtain ⟨rfl⟩ := h
+  exact Inclusion.add_mem hx hy
 
 theorem natCast_mem (n : ℕ) : (n : ℝ) ∈ Inclusion.ofNat n := by
   constructor
@@ -135,23 +141,33 @@ meta def testParam : InclusionParamDecl where
   name := `testParam
   defaultValue := some 7
 
+inductive ParameterizedUpperBound (x : ℝ) : Prop where
+  | intro (h : x ≤ 1)
+
+def parameterizedUpperInterval (n : ℕ) : Interval Dyadic :=
+  if n = 7 then (Inclusion.ofNat 1).downwardClosure else Interval.univ Dyadic
+
+@[hypothesisOp test.hypothesis]
+theorem ParameterizedUpperBound.mem (testParam : ℕ) {x : ℝ}
+    (h : ParameterizedUpperBound x) : x ∈ parameterizedUpperInterval testParam := by
+  rcases h with ⟨hx⟩
+  by_cases hn : testParam = 7
+  · simpa [parameterizedUpperInterval, hn] using
+      downwardClosure_mem hx (Inclusion.ofNat_mem 1)
+  · simpa [parameterizedUpperInterval, hn] using Inclusion.mem_univ x
+
 def parameterizedTrue : Prop := True
 
 def parameterizedTrueCheck (n : Nat) : IntervalBool :=
   if n = 7 then .true else .undetermined
 
-theorem parameterizedTrue_mem (n : Nat) : parameterizedTrue ∈ parameterizedTrueCheck n := by
+@[inclusionOp real.dyadic 900]
+theorem parameterizedTrue_mem (testParam : Nat) :
+    parameterizedTrue ∈ parameterizedTrueCheck testParam := by
   unfold parameterizedTrueCheck
   split
   · exact Inclusion.mem_intervalBool_true trivial
   · exact Inclusion.mem_intervalBool_undetermined _
-
-@[inclusionExt real.dyadic | parameterizedTrue]
-meta def evalParameterizedTrue : InclusionExt where
-  derive e := do
-    unless e.isConstOf ``parameterizedTrue do failure
-    let some n ← getParam? `testParam | failure
-    return ⟨← mkAppM ``parameterizedTrueCheck #[n], ← mkAppM ``parameterizedTrue_mem #[n]⟩
 
 def parameterizedEndpoint : ℝ := 1
 
@@ -169,7 +185,7 @@ theorem parameterizedEndpoint_mem (n : Nat) :
 meta def evalParameterizedEndpoint : InclusionExt where
   derive e := do
     unless e.isConstOf ``parameterizedEndpoint do failure
-    let some n ← getParam? `testParam | failure
+    let n ← getParam `testParam
     return ⟨← mkAppM ``parameterizedEndpointInterval #[n],
       ← mkAppM ``parameterizedEndpoint_mem #[n]⟩
 
@@ -274,6 +290,18 @@ example {x : ℝ} (hx : x ≤ familyValue) : x ≤ 1 := by
 example {x : ℝ} (hx : FamilyUpperBound x) : x ≤ 1 := by
   inclusion [core, real.dyadic, test.hypothesis]
 
+example {z : ℝ} (hz : IsSum z 1 2) : z ≤ 3 := by
+  inclusion [core, real.dyadic, test.hypothesis]
+
+example {x : ℝ} (hx : ParameterizedUpperBound x) : x ≤ 1 := by
+  inclusion [core, real.dyadic, test.hypothesis]
+
+example {x : ℝ} (_hx : ParameterizedUpperBound x) : True := by
+  fail_if_success
+    have : x ≤ 1 := by
+      inclusion [core, real.dyadic, test.hypothesis] (testParam := 6)
+  trivial
+
 example {x : ℝ} (_hx : FamilyUpperBound x) : True := by
   fail_if_success
     have : x ≤ 1 := by
@@ -349,6 +377,9 @@ example {x : ℝ} (hx : x ∈ Set.Ioc 1 2) : x + x ≤ 4 := by
   inclusion [core, real.dyadic]
 
 example {x : ℝ} (hx : x ∈ Set.Icc 1 2) : x + x ≤ 4 := by
+  inclusion [core, real.dyadic]
+
+example {x : ℝ} (hx : x ∈ Set.Icc (indexedValue 1) (indexedValue 2)) : x + x ≤ 4 := by
   inclusion [core, real.dyadic]
 
 example {x : ℝ} (hx : x ∈ Set.Ioo 1 2) : x + x ≤ 4 := by

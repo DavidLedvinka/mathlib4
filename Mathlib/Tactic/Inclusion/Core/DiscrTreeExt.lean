@@ -5,7 +5,6 @@ Authors: David Ledvinka
 -/
 module
 
-public import Lean.Compiler.IR.CompilerM
 public meta import Lean.Elab.Term.TermElabM
 public meta import Lean.Meta.DiscrTree
 
@@ -45,10 +44,6 @@ variable {α : Type}
 def State.getMatch (state : State α) (e : Expr) : MetaM (Array α) :=
   state.tree.getMatch e
 
-/-- Return the declaration values whose patterns match `e`, ordered by increasing priority. -/
-def State.getSortedMatch (state : State α) (e : Expr) (priority : α → Nat) : MetaM (Array α) := do
-  return (← state.getMatch e).qsort fun a b => priority a < priority b
-
 /-- Create a scoped environment extension whose declarations have type `typeName`. By default, the
 environment extension is named after the declaration in which this function is called. -/
 def initializeEnvExt (typeName : Name)
@@ -74,16 +69,5 @@ def elabExtKeys (patterns : Array Syntax) : CoreM (Array (Array DiscrTree.Key)) 
         let (_, _, e) ← lambdaMetaTelescope (← mkLambdaFVars (← getLCtx).getFVars e)
         return e
     DiscrTree.mkPath e
-
-/-- Evaluate `declName` and add it to `envExt` under the given expression patterns. -/
-def addDecl (attrName : Name) (envExt : EnvExt α) (typeName declName : Name)
-    (patterns : Array Syntax) (kind : AttributeKind) : AttrM Unit := do
-  let env ← getEnv
-  ensureAttrDeclIsMeta attrName declName kind
-  unless (env.getModuleIdxFor? declName).isNone do
-    throwError "invalid attribute `{attrName}`, declaration is in an imported module"
-  if (IR.getSorryDep env declName).isSome then return
-  let ext ← evalDecl α typeName declName
-  envExt.add ((← elabExtKeys patterns, declName), ext) kind
 
 end DiscrTreeExt

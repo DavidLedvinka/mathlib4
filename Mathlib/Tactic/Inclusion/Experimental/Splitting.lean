@@ -1,5 +1,6 @@
 module
 
+public import Mathlib.Tactic.Inclusion.Experimental.DyadicRealOperations
 public import Mathlib.Tactic.Inclusion.Extension.Extensions
 public meta import Mathlib.Tactic.Inclusion.Extension.Extensions
 public import Mathlib.Tactic.Inclusion.Extension.Splitter

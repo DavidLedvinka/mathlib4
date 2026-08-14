@@ -8,9 +8,9 @@ module
 public meta import Mathlib.Tactic.Inclusion.Core.Extensions
 
 /-!
-# Standard families for the `inclusion` tactic
+# Dyadic real extension family for the `inclusion` tactic
 
-This file registers the standard extension families used by the `inclusion` tactic.
+This file registers the family using dyadic intervals to enclose real expressions.
 -/
 
 public meta section
