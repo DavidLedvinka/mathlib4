@@ -81,29 +81,6 @@ def collectHyps : HypothesisM Unit := do
     unless ldecl.isImplementationDetail do
       runHypothesisExts ldecl.toExpr
 
-/-- Construct the universal inclusion body for `iExpr`. -/
-def mkUniversalHypBody (iExpr : IExpr) : MetaM ExprInclusionBody := do
-  let univ ← iExpr.iType.synthUniv
-  return ⟨← iExpr.iType.mkUniv univ, ← iExpr.mkMemUniv univ⟩
-
-/-- Combine the candidate hypothesis bodies for `iExpr` using `Refine`, or use its `Univ`
-instance when there are no candidates. -/
-def combineHypBodies (iExpr : IExpr) (bodies : Array ExprInclusionBody) :
-    MetaM ExprInclusionBody := do
-  if bodies.isEmpty then
-    return ← mkUniversalHypBody iExpr
-  let first := bodies[0]!
-  if bodies.size = 1 then
-    return first
-  let refiner ← iExpr.iType.synthRefine
-  let mut set := first.inclusionBody
-  let mut proof := first.proofBody
-  for h : i in [1:bodies.size] do
-    let next := bodies[i]
-    set ← iExpr.iType.mkRefine refiner set next.inclusionBody
-    proof ← mkAppM ``Refine.mem_refine #[proof, next.proofBody]
-  return ⟨set, proof⟩
-
 /-- Given an `output : IExpr` and a `body : ExprInclusionBody`, construct an `ExprInclusion` for
 `output.expr` by collecting inclusion hypotheses from the local context and closing the body. -/
 def mkExprInclusion (output : IExpr) (body : ExprInclusionBody) : HypothesisM ExprInclusion := do
@@ -114,7 +91,10 @@ def mkExprInclusion (output : IExpr) (body : ExprInclusionBody) : HypothesisM Ex
     | true => some <$> output.iType.synthCoarsen
     | false => pure none
   let body ← context.iVars.foldrM (init := body) fun iVar body => do
-    let hypBody ← combineHypBodies iVar.iExpr (state.inclusions[iVar.expr]?.getD #[])
+    let accumulated ← match state.inclusions[iVar.expr]? with
+      | some accumulated => pure accumulated
+      | none => iVar.mkEmptyHypBody
+    let hypBody ← iVar.finishHypBody accumulated
     let inclusion ← mkLambdaFVars #[iVar.setVar] body.inclusionBody
       (binderInfoForMVars := .default)
     let proof ← mkLambdaFVars #[iVar.setVar, iVar.hypVar] body.proofBody

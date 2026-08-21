@@ -40,8 +40,6 @@ structure HypothesisExt where
   userName : Name := by exact decl_name%
   /-- Attempt to construct inclusion hypotheses from `h`. -/
   derive (h : Expr) : HypothesisM Unit
-  /-- The priority of the extension. Extensions with higher priority are tried first. -/
-  priority : Nat := eval_prio default
 
 /-- A family of inclusion and hypothesis extensions. -/
 structure InclusionFamily where
@@ -94,8 +92,7 @@ def getInclusionExtMatches (families : Array Name) (e : Expr) :
       matched := matched.push (familyName, ext)
   return matched.qsort fun (_, a) (_, b) => a.priority > b.priority
 
-/-- Return an array of the hypothesis extensions in `families` whose `DiscrTree` key matches `e`,
-sorted in order of highest to lowest priority. -/
+/-- Return an array of the hypothesis extensions in `families` whose `DiscrTree` key matches `e`. -/
 def getHypothesisExtMatches (families : Array Name) (e : Expr) :
     MetaM (Array (Name × HypothesisExt)) := do
   let env ← getEnv
@@ -104,7 +101,7 @@ def getHypothesisExtMatches (families : Array Name) (e : Expr) :
     let family ← getInclusionFamily familyName
     for ext in ← family.hypothesisExt.getState env |>.getMatch e do
       matched := matched.push (familyName, ext)
-  return matched.qsort fun (_, a) (_, b) => a.priority > b.priority
+  return matched
 
 section InclusionParam
 

@@ -166,7 +166,7 @@ def deriveHypothesisOp (theoremName : Name) (sourceIdx : Nat) (hypArgs : Array H
   sourceId.assign h
   let some (e, s, _) := toSetMem? conclusion | failure
   let e ← instantiateMVars e
-  let some ⟨iExpr, _, _, _⟩ ← findIVar? e | failure
+  let some iVar ← findIVar? e | failure
   for ⟨name, idx⟩ in paramArgs do
     unless ← isDefEq args[idx]! (← HypothesisM.getParam name) do failure
   for ⟨elemIdx, setIdx, proofIdx⟩ in hypArgs do
@@ -184,7 +184,7 @@ def deriveHypothesisOp (theoremName : Name) (sourceIdx : Nat) (hypArgs : Array H
           hypothesis extension generated from `{.ofConstName theoremName}`"
   let inclusionBody ← instantiateMVars s
   let proofBody ← instantiateMVars (mkAppN theoremExpr args)
-  addInclusionHyp iExpr { inclusionBody, proofBody }
+  addInclusionHyp iVar { inclusionBody, proofBody }
 
 /-- Extract the `HypArg` and `ParamArg` metadata from a theorem declaration. -/
 private def getOpArgInfo (declName : Name) (matchExpr : Expr)
@@ -295,30 +295,30 @@ private def getHypothesisOpInfo (declName : Name) :
   return (← DiscrTree.mkPath sourceType, sourceIdx, hypArgs, params)
 
 /-- Generate and register a hypothesis extension from `theoremName` in `familyName`. -/
-private def addHypothesisOp (theoremName familyName : Name) (priority : Nat)
+private def addHypothesisOp (theoremName familyName : Name)
     (kind : AttributeKind) : AttrM Unit := do
   let (path, sourceIdx, hypArgs, params) ← MetaM.run' <| getHypothesisOpInfo theoremName
   let extName ← withDeclNameForAuxNaming theoremName do mkAuxDeclName `_hypothesisExt
   let derive := mkAppN (mkConst ``deriveHypothesisOp)
     #[toExpr theoremName, toExpr sourceIdx, toExpr hypArgs, toExpr params]
   let value := mkAppN (mkConst ``HypothesisExt.mk)
-    #[toExpr extName, toExpr theoremName, derive, toExpr priority]
+    #[toExpr extName, toExpr theoremName, derive]
   let decl ← mkDefinitionValInferringUnsafe extName [] (mkConst ``HypothesisExt) value .opaque
   addAndCompile (.defnDecl decl) (markMeta := true)
   addHypothesisExt familyName extName #[path] kind
 
 /-- Syntax for registering a hypothesis extension from a theorem using the `hypothesisOp`
 attribute. -/
-syntax (name := hypothesisOpAttr) "hypothesisOp " ident (prio)? : attr
+syntax (name := hypothesisOpAttr) "hypothesisOp " ident : attr
 
 initialize registerBuiltinAttribute {
   name := `hypothesisOpAttr
   descr := "adds an inclusion-hypothesis operation"
   applicationTime := .afterCompilation
   add := fun declName stx kind => match stx with
-    | `(attr| hypothesisOp $familyName:ident $[$_prio:prio]?) => do
+    | `(attr| hypothesisOp $familyName:ident) => do
       if (IR.getSorryDep (← getEnv) declName).isSome then return
-      addHypothesisOp declName familyName.getId (← getAttrParamOptPrio stx[2]) kind
+      addHypothesisOp declName familyName.getId kind
     | _ => throwUnsupportedSyntax
   erase := fun _ => throwError "Hypothesis operations cannot be erased by declaration"
 }

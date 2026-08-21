@@ -52,6 +52,9 @@ lemma toReal_neg (a : Dyadic) : toReal (-a) = -toReal a := by simp [toReal]
 lemma toReal_sub (a b : Dyadic) : toReal (a - b) = toReal a - toReal b := by simp [toReal]
 
 @[simp]
+lemma toReal_mul (a b : Dyadic) : toReal (a * b) = toReal a * toReal b := by simp [toReal]
+
+@[simp]
 lemma toReal_natCast (n : ℕ) : toReal (n : Dyadic) = (n : ℝ) := by simp [toReal]
 
 @[simp]

@@ -39,6 +39,45 @@ def mkToSetMem (xType setType x s toSetInst : Expr) : MetaM Expr := do
 def IExpr.mkMem (iExpr : IExpr) (set : Expr) : MetaM Expr :=
   mkToSetMem iExpr.iType.elemType iExpr.iType.setType iExpr.expr set iExpr.iType.toSetInst
 
+/-- Construct the initial accumulated hypothesis body for `iVar`. -/
+def IVar.mkEmptyHypBody (iVar : IVar) : MetaM ExprInclusionBody := do
+  let inclusionBody ← mkAppM ``HypothesisAccumulator.empty #[iVar.hypType.accumulator]
+  let proofBody ← mkAppM ``HypothesisAccumulator.mem_empty
+    #[iVar.hypType.accumulator, iVar.expr]
+  return { inclusionBody, proofBody }
+
+/-- Combine two accumulated hypothesis bodies for `iVar`. -/
+def IVar.combineHypBodies (iVar : IVar) (left right : ExprInclusionBody) :
+    MetaM ExprInclusionBody := do
+  let inclusionBody ← mkAppM ``HypothesisAccumulator.combine
+    #[iVar.hypType.accumulator, left.inclusionBody, right.inclusionBody]
+  let proofBody ← mkAppM ``HypothesisAccumulator.mem_combine
+    #[iVar.hypType.accumulator, left.proofBody, right.proofBody]
+  return { inclusionBody, proofBody }
+
+/-- Convert a hypothesis body in the main representation of `iVar` to its accumulator
+representation. -/
+def IVar.accumulateMainHypBody (iVar : IVar) (body : ExprInclusionBody) :
+    MetaM ExprInclusionBody := do
+  let inclusionBody ← mkAppM ``HypothesisAccumulator.ofMain
+    #[iVar.hypType.accumulator, body.inclusionBody]
+  let proofBody ← mkAppM ``HypothesisAccumulator.mem_ofMain
+    #[iVar.hypType.accumulator, body.proofBody]
+  return { inclusionBody, proofBody }
+
+/-- Convert an accumulated hypothesis body for `iVar` to its main representation. -/
+def IVar.finishHypBody (iVar : IVar) (body : ExprInclusionBody) :
+    MetaM ExprInclusionBody := do
+  let result ← mkAppM ``HypothesisAccumulator.toMain?
+    #[iVar.hypType.accumulator, body.inclusionBody]
+  let result' ← whnf result
+  let (``Option.some, #[_, inclusionBody]) := result'.getAppFnArgs
+    | throwError "The hypotheses for {iVar.expr} do not determine an inclusion in \
+        {iVar.type.setType}"
+  let proofBody ← mkAppM ``HypothesisAccumulator.mem_toMain
+    #[iVar.hypType.accumulator, body.proofBody, ← mkEqRefl result]
+  return { inclusionBody, proofBody }
+
 /-- Given
 
 · `source : iVar.type.setType`,
@@ -81,37 +120,6 @@ def IType.synthCoarsen (iType : IType) : MetaM Expr := do
   let type ← mkAppOptM ``Coarsen #[iType.setType, iType.elemType, iType.toSetInst]
   try synthInstance type catch _ =>
     throwError "No `Coarsen` instance is registered for {iType.setType}"
-
-/-- Given `iType : IType`, `refiner : Refine iType.setType iType.elemType`, and expressions
-`left right : iType.setType`, create the expression `refiner.refine left right`. -/
-def IType.mkRefine (iType : IType) (refiner left right : Expr) : MetaM Expr :=
-  mkAppOptM ``Refine.refine #[iType.setType, iType.elemType, iType.toSetInst, refiner, left, right]
-
-/-- Given `iType : IType`, synthesize an expression of type
-`Refine iType.setType iType.elemType`. -/
-def IType.synthRefine (iType : IType) : MetaM Expr := do
-  let type ← mkAppOptM ``Refine #[iType.setType, iType.elemType, iType.toSetInst]
-  try synthInstance type catch _ =>
-    throwError "No `Refine` instance is registered for {iType.setType}"
-
-/-- Given `iType : IType` and `univ : Univ iType.setType iType.elemType`, create the expression
-`univ.univ : iType.setType`. -/
-def IType.mkUniv (iType : IType) (univ : Expr) : MetaM Expr :=
-  mkAppOptM ``Univ.univ #[iType.setType, iType.elemType, iType.toSetInst, univ]
-
-/-- Given `iExpr : IExpr` and `univ : Univ iExpr.iType.setType iExpr.iType.elemType`, create a
-proof of `iExpr.expr ∈ univ.univ`. -/
-def IExpr.mkMemUniv (iExpr : IExpr) (univ : Expr) : MetaM Expr := do
-  let setLevel ← getDecLevel iExpr.iType.setType
-  let elemLevel ← getDecLevel iExpr.iType.elemType
-  return mkAppN (mkConst ``Univ.mem_univ [setLevel, elemLevel])
-    #[iExpr.iType.setType, iExpr.iType.elemType, iExpr.iType.toSetInst, univ, iExpr.expr]
-
-/-- Given `iType : IType`, synthesize an expression of type `Univ iType.setType iType.elemType`. -/
-def IType.synthUniv (iType : IType) : MetaM Expr := do
-  let type ← mkAppOptM ``Univ #[iType.setType, iType.elemType, iType.toSetInst]
-  try synthInstance type catch _ =>
-    throwError "No `Univ` instance is registered for {iType.setType}"
 
 /-- Given an expression `b : IntervalBool`, create the expression proving `b = b`. -/
 def mkIntervalBoolRefl (b : Expr) : Expr :=

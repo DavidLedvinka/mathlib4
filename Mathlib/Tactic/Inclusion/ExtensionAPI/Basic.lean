@@ -48,8 +48,9 @@ def HypothesisM.getParam (name : Name) : HypothesisM Expr := do
     | throwError "No value was supplied for inclusion parameter `{name}`"
   return value
 
-/-- Check that `iExpr` is well formed in `localContext`. -/
-private def checkIVarWellFormed (localContext : LocalContext) (iExpr : IExpr) : MetaM Unit := do
+/-- Check that `iExpr` and its hypothesis representation are well formed in `localContext`. -/
+private def checkIVarWellFormed (localContext : LocalContext) (iExpr : IExpr)
+    (hypType : HypothesisType) : MetaM Unit := do
   let ⟨iType, e⟩ := iExpr
   unless ← MetavarContext.isWellFormed localContext e do
     throwError "Cannot create an inclusion variable for {e} because it depends on variables \
@@ -63,23 +64,45 @@ private def checkIVarWellFormed (localContext : LocalContext) (iExpr : IExpr) : 
   unless ← MetavarContext.isWellFormed localContext iType.toSetInst do
     throwError "Cannot use the `ToSet` instance for {e} because it depends on variables \
       introduced while constructing the inclusion"
+  unless ← MetavarContext.isWellFormed localContext hypType.iType.elemType do
+    throwError "Cannot use the hypothesis element type for {e} because it depends on variables \
+      introduced while constructing the inclusion"
+  unless ← MetavarContext.isWellFormed localContext hypType.iType.setType do
+    throwError "Cannot use hypothesis set type {hypType.iType.setType} for {e} because it depends \
+      on variables introduced while constructing the inclusion"
+  unless ← isDefEq hypType.iType.elemType iType.elemType do
+    throwError "The hypothesis representation for {e} has an unexpected element type"
+  unless ← MetavarContext.isWellFormed localContext hypType.iType.toSetInst do
+    throwError "Cannot use the hypothesis `ToSet` instance for {e} because it depends on variables \
+      introduced while constructing the inclusion"
+  unless ← MetavarContext.isWellFormed localContext hypType.accumulator do
+    throwError "Cannot use the hypothesis accumulator for {e} because it depends on variables \
+      introduced while constructing the inclusion"
+  let expectedType ← mkAppOptM ``HypothesisAccumulator
+    #[hypType.iType.setType, iType.setType, iType.elemType, hypType.iType.toSetInst,
+      iType.toSetInst]
+  unless ← isDefEq (← inferType hypType.accumulator) expectedType do
+    throwError "The hypothesis accumulator for {e} has an unexpected type"
 
-/-- Create and register an inclusion variable for `iExpr`. -/
-def mkIVar (iExpr : IExpr) (cover : Option Expr := none) : InclusionM IVar := do
+/-- Create and register an inclusion variable for `iExpr`, accumulating its hypotheses according
+to `hypType`. -/
+def mkIVar (iExpr : IExpr) (hypType : HypothesisType) (cover : Option Expr := none) :
+    InclusionM IVar := do
   let ctx ← read
   if ctx.noIVars then
     throwError "Cannot create an inclusion variable for {iExpr.expr} since `noIVars` is set to true"
-  checkIVarWellFormed ctx.localContext iExpr
+  checkIVarWellFormed ctx.localContext iExpr hypType
   let setVar ←
     mkFreshExprMVarAt ctx.localContext ctx.localInstances iExpr.iType.setType .syntheticOpaque
-  let hypType ← iExpr.mkMem setVar
-  let hypVar ← mkFreshExprMVarAt ctx.localContext ctx.localInstances hypType .syntheticOpaque
-  let iVar := { iExpr, setVar, hypVar, cover }
+  let hypVarType ← iExpr.mkMem setVar
+  let hypVar ← mkFreshExprMVarAt ctx.localContext ctx.localInstances hypVarType .syntheticOpaque
+  let iVar := { iExpr, hypType, setVar, hypVar, cover }
   modify fun state => { state with iVars := state.iVars.insert iVar.expr iVar }
   return iVar
 
-/-- Construct an inclusion extension for making non dependently typed inclusion variables. -/
-def mkNDIVarExt (iType : IType)
+/-- Construct an inclusion extension for making non dependently typed inclusion variables with
+main inclusion type `iType` and the hypothesis representation constructed by `mkHypType iExpr`. -/
+def mkNDIVarExt (iType : IType) (mkHypType : IExpr → InclusionM HypothesisType)
     (mkCover : InclusionM (Option Expr) := pure none)
     (priority : Nat := eval_prio low) (name : Name := by exact decl_name%) : InclusionExt where
   declName := name
@@ -89,21 +112,16 @@ def mkNDIVarExt (iType : IType)
     let eType ← inferType e
     unless ← isDefEq eType iType.elemType do failure
     let iExpr : IExpr := ⟨iType, e⟩
-    return (← mkIVar iExpr (← mkCover)).toExprInclusionBody
+    return (← mkIVar iExpr (← mkHypType iExpr) (← mkCover)).toExprInclusionBody
 
 /-- Return the inclusion variable registered for `e`, if there is one. -/
 def findIVar? (e : Expr) : HypothesisM (Option IVar) := do
   return (← read).iVarsMap[e]?
 
-/-- Check that two inclusion types are definitionally equal, including their chosen `ToSet`
-instances. -/
-def ensureOutputType (type expectedType : IType) : MetaM Unit := do
-  unless ← pureIsDefEq type.elemType expectedType.elemType do
-    throwError "Inclusion has expression type {type.elemType}, expected {expectedType.elemType}"
-  unless ← pureIsDefEq type.setType expectedType.setType do
-    throwError "Inclusion has set type {type.setType}, expected {expectedType.setType}"
-  unless ← pureIsDefEq type.toSetInst expectedType.toSetInst do
-    throwError "Inclusion uses an unexpected `ToSet` instance"
+private def IType.isDefEq (type expectedType : IType) : MetaM Bool := do
+  unless ← pureIsDefEq type.elemType expectedType.elemType do return false
+  unless ← pureIsDefEq type.setType expectedType.setType do return false
+  pureIsDefEq type.toSetInst expectedType.toSetInst
 
 /-- Construct a closed inclusion body for an expression argument of a hypothesis rule. -/
 def mkHypExprInclusionBody (e : Expr) : HypothesisM ExprInclusionBody := do
@@ -118,11 +136,22 @@ def mkHypExprInclusionBody (e : Expr) : HypothesisM ExprInclusionBody := do
     throwError "The inclusion hypothesis generated from {e} contains a metavariable"
   return body
 
-/-- Add the inclusion hypothesis `body` for `iExpr`. -/
-def addInclusionHyp (iExpr : IExpr) (body : ExprInclusionBody) : HypothesisM Unit := do
-  ensureOutputType (← body.inferIType iExpr.expr) iExpr.iType
-  modify fun state => { state with inclusions := state.inclusions.alter iExpr.expr fun
-    | some hyps => hyps.push body
-    | none => #[body] }
+/-- Add the inclusion hypothesis `body` for `iVar`, converting it from the main representation to
+the accumulator representation when necessary. -/
+def addInclusionHyp (iVar : IVar) (body : ExprInclusionBody) : HypothesisM Unit := do
+  let hypIExpr := iVar.hypIExpr
+  let bodyType ← body.inferIType hypIExpr.expr
+  let body ← if ← bodyType.isDefEq hypIExpr.iType then
+    pure body
+  else if ← bodyType.isDefEq iVar.type then
+    iVar.accumulateMainHypBody body
+  else
+    throwError "Inclusion hypothesis for {iVar.expr} has set type {bodyType.setType}, expected \
+      {hypIExpr.iType.setType} or {iVar.type.setType}"
+  let state ← get
+  let body ← match state.inclusions[iVar.expr]? with
+    | some accumulated => iVar.combineHypBodies accumulated body
+    | none => pure body
+  set { state with inclusions := state.inclusions.insert iVar.expr body }
 
 end Inclusion

@@ -41,7 +41,10 @@ def mkBinSplitCover : InclusionM (Option Expr) := do
 /-- Construct an inclusion variable for a real expression using a dyadic interval. -/
 @[inclusionExt interval_dyadic_real | (_ : ℝ)]
 def mkRealIVar : InclusionExt :=
-  mkNDIVarExt ⟨q(ℝ), q(Interval Dyadic), q(instToSetIntervalDyadicReal)⟩ mkBinSplitCover
+  let iType : IType := ⟨q(ℝ), q(Interval Dyadic), q(instToSetIntervalDyadicReal)⟩
+  let hypType : HypothesisType :=
+    ⟨iType, q(HypothesisAccumulator.self (Iα := Interval Dyadic) (α := ℝ))⟩
+  mkNDIVarExt iType (fun _ => pure hypType) (mkCover := mkBinSplitCover)
 
 end IntervalDyadicReal
 end Inclusion

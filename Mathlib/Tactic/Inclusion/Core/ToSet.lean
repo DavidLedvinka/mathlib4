@@ -60,6 +60,40 @@ class Refine (Iα α : Type*) [ToSet Iα α] where
   /-- If `x ∈ s` and `x ∈ t` then `x ∈ refine s t`. -/
   mem_refine {x : α} {s t : Iα} (hs : x ∈ s) (ht : x ∈ t) : x ∈ refine s t
 
+/-- A `HypothesisAccumulator Hα Iα α` describes how inclusion hypotheses represented by `Hα`
+are accumulated and then converted to an inclusion represented by `Iα`. -/
+structure HypothesisAccumulator (Hα Iα α : Type*) [ToSet Hα α] [ToSet Iα α] where
+  /-- The initial accumulator, used when no inclusion hypotheses are available. -/
+  empty : Hα
+  /-- Every element belongs to the initial accumulator. -/
+  mem_empty (x : α) : x ∈ empty
+  /-- Combine two accumulated inclusion hypotheses. -/
+  combine : Hα → Hα → Hα
+  /-- Membership in both inputs implies membership in their combination. -/
+  mem_combine {x : α} {s t : Hα} (hs : x ∈ s) (ht : x ∈ t) : x ∈ combine s t
+  /-- Convert an inclusion in the main representation to an accumulator. -/
+  ofMain : Iα → Hα
+  /-- The conversion from the main representation preserves membership. -/
+  mem_ofMain {x : α} {s : Iα} (hx : x ∈ s) : x ∈ ofMain s
+  /-- Try to convert an accumulated hypothesis to the main representation. -/
+  toMain? : Hα → Option Iα
+  /-- A successful conversion to the main representation preserves membership. -/
+  mem_toMain {x : α} {s : Hα} {t : Iα} (hx : x ∈ s) (h : toMain? s = some t) : x ∈ t
+
+/-- Accumulate hypotheses directly in their main inclusion representation. -/
+def HypothesisAccumulator.self {Iα α : Type*} [ToSet Iα α] [Univ Iα α] [Refine Iα α] :
+    HypothesisAccumulator Iα Iα α where
+  empty := Univ.univ α
+  mem_empty := Univ.mem_univ
+  combine := Refine.refine α
+  mem_combine := Refine.mem_refine
+  ofMain := id
+  mem_ofMain := id
+  toMain? := some
+  mem_toMain hx h := by
+    cases Option.some.inj h
+    exact hx
+
 /-- A `Coarsen Iα α` instance is a specification of a (computable) function `coarsen : Iα → Iα → Iα`
 such that for any `s t : Iα`, `s ∪ t ⊆ coarsen s t`. This is useful for applying an inclusion
 function to a cover of the input and then merging the results. -/

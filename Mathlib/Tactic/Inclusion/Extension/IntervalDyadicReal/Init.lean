@@ -12,8 +12,8 @@ public import Mathlib.Tactic.Inclusion.Extension.Interval
 /-!
 # Initialization for the dyadic real interval extension family
 
-This file initializes the `interval_dyadic_real` inclusion family and defines the `ToSet`,
-`Univ` and `Coarsen` instances it uses in the `inclusion` tactic.
+This file initializes the `interval_dyadic_real` inclusion family and defines the `ToSet`, `Univ`,
+`Refine`, and `Coarsen` instances it uses in the `inclusion` tactic.
 -/
 
 @[expose] public section

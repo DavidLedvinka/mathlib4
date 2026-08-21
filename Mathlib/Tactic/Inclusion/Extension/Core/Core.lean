@@ -32,7 +32,7 @@ def instMembershipHyp : HypothesisExt where
     let some (expr, set, _) := toSetMem? type | failure
     if set.hasFVar || set.hasMVar then failure
     let some iVar ← findIVar? expr | failure
-    addInclusionHyp iVar.iExpr ⟨set, h⟩
+    addInclusionHyp iVar ⟨set, h⟩
 
 /-- `HypothesisExt` for conjunction hypotheses. -/
 @[hypothesisExt core | _ ∧ _]

@@ -42,13 +42,27 @@ structure IExpr where
   expr : Expr
   deriving Inhabited
 
+/-- A `HypothesisType` specifies the representation used while accumulating hypotheses for an
+inclusion variable and how that representation is converted to the variable's main `IType`. -/
+structure HypothesisType where
+  /-- The type used to represent accumulated inclusion hypotheses. -/
+  iType : IType
+  /-- When attached to an inclusion variable with main type `mainType`, an expression of type
+  `HypothesisAccumulator iType.setType mainType.setType mainType.elemType`. -/
+  accumulator : Expr
+  deriving Inhabited
+
 /-- An `IVar` is a structure that holds the data of a "free inclusion variable" associated to an
 inclusion expression `iExpr`. This includes a pair of variables `setVar`, `hypVar` (which are
 sometimes free variables but often synthetic opaque metavariables), where `setVar` is a variable for
-an inclusion set and `hypVar` is a (variable) proof of `iExpr.expr ∈ setVar`. -/
+an inclusion set and `hypVar` is a (variable) proof of `iExpr.expr ∈ setVar`. Its `hypType`
+specifies how local hypotheses are accumulated before producing the value substituted for
+`setVar`. -/
 structure IVar where
   /-- The inclusion expression represented by the inclusion variable. -/
   iExpr : IExpr
+  /-- The representation used to accumulate hypotheses for the inclusion variable. -/
+  hypType : HypothesisType
   /-- The inclusion set variable. -/
   setVar : Expr
   /-- The variable `hypVar : iExpr.expr ∈ setVar`. -/
@@ -62,6 +76,9 @@ def IVar.type (iVar : IVar) : IType := iVar.iExpr.iType
 
 /-- The associated expression of an `IVar`. -/
 def IVar.expr (iVar : IVar) : Expr := iVar.iExpr.expr
+
+/-- The inclusion expression used while accumulating hypotheses for an `IVar`. -/
+def IVar.hypIExpr (iVar : IVar) : IExpr := ⟨iVar.hypType.iType, iVar.expr⟩
 
 /-- An `ExprInclusion` is a structure associated with an expression `e`, containing a computed
 inclusion set for `e` and a proof that this inclusion is correct. -/
@@ -140,8 +157,8 @@ structure HypothesisM.Context extends InclusionM.Context where
 
 /-- The mutable state of the `HypothesisM` monad. -/
 structure HypothesisM.State where
-  /-- The candidate inclusion bodies derived for each requested expression. -/
-  inclusions : ExprMap (Array ExprInclusionBody) := {}
+  /-- The accumulated hypothesis body for each requested expression. -/
+  inclusions : ExprMap ExprInclusionBody := {}
 
 /-- The monad used by the `inclusion` tactic to construct initial inclusion hypotheses. -/
 abbrev HypothesisM := ReaderT HypothesisM.Context <| StateT HypothesisM.State MetaM
