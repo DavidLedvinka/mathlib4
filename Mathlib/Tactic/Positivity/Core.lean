@@ -23,7 +23,7 @@ and elsewhere.
 public meta section
 
 open Lean
-open Lean.Meta Qq Lean.Elab Term
+open Lean.Meta Qq Lean.Elab
 
 /-- A definition of type `PositivityExt` tagged `@[positivity t]` extends the `positivity` tactic.
 The term (with underscores) `t` indicates which expressions this extension accepts.
@@ -95,29 +95,16 @@ structure PositivityExt where
     MetaM (Strictness zα e pα?)
 
 /-- Read a `positivity` extension from a declaration of the right type. -/
-def mkPositivityExt (n : Name) : ImportM PositivityExt := do
-  let { env, opts, .. } ← read
-  IO.ofExcept <| unsafe env.evalConstCheck PositivityExt opts ``PositivityExt n
+def mkPositivityExt (n : Name) : ImportM PositivityExt :=
+  DiscrTreeExt.evalDecl PositivityExt ``PositivityExt n
 
 /-- Each `positivity` extension is labelled with a collection of patterns
 which determine the expressions to which it should be applied. -/
-abbrev Entry := Array (Array DiscrTree.Key) × Name
+abbrev Entry := DiscrTreeExt.Entry
 
 /-- Environment extensions for `positivity` declarations -/
-initialize positivityExt : PersistentEnvExtension Entry (Entry × PositivityExt)
-    (List Entry × DiscrTree PositivityExt) ←
-  -- we only need this to deduplicate entries in the DiscrTree
-  have : BEq PositivityExt := ⟨fun _ _ => false⟩
-  let insert kss v dt := kss.foldl (fun dt ks => dt.insertKeyValue ks v) dt
-  registerPersistentEnvExtension {
-    mkInitial := pure ([], {})
-    addImportedFn := fun s => do
-      let dt ← s.foldlM (init := {}) fun dt s => s.foldlM (init := dt) fun dt (kss, n) => do
-        pure (insert kss (← mkPositivityExt n) dt)
-      pure ([], dt)
-    addEntryFn := fun (entries, s) ((kss, n), ext) => ((kss, n) :: entries, insert kss ext s)
-    exportEntriesFn := fun s => s.1.reverse.toArray
-  }
+initialize positivityExt : DiscrTreeExt.EnvExt PositivityExt ←
+  DiscrTreeExt.initializeEnvExt ``PositivityExt
 
 initialize registerBuiltinAttribute {
   name := `positivity
@@ -125,24 +112,10 @@ initialize registerBuiltinAttribute {
   applicationTime := .afterCompilation
   add := fun declName stx kind => match stx with
     | `(attr| positivity $es,*) => do
-      ensureAttrDeclIsMeta `positivity declName kind
-      unless kind == AttributeKind.global do
-        throwError "invalid attribute 'positivity', must be global"
-      let env ← getEnv
-      unless (env.getModuleIdxFor? declName).isNone do
-        throwError "invalid attribute 'positivity', declaration is in an imported module"
-      if (IR.getSorryDep env declName).isSome then return -- ignore in progress definitions
-      let ext ← mkPositivityExt declName
-      let keys ← MetaM.run' <| es.getElems.mapM fun stx => do
-        let e ← TermElabM.run' <| withSaveInfoContext <| withAutoBoundImplicit <|
-          withReader ({ · with ignoreTCFailures := true }) do
-            let e ← elabTerm stx none
-            let (_, _, e) ← lambdaMetaTelescope (← mkLambdaFVars (← getLCtx).getFVars e)
-            return e
-        DiscrTree.mkPath e
-      setEnv <| positivityExt.addEntry env ((keys, declName), ext)
-      -- TODO: track what `[positivity]` decls are actually used at use sites
-      recordExtraRevUseOfCurrentModule
+      if ← DiscrTreeExt.addDecl `positivity positivityExt ``PositivityExt declName
+          es.getElems kind then
+        -- TODO: track what `[positivity]` decls are actually used at use sites
+        recordExtraRevUseOfCurrentModule
     | _ => throwUnsupportedSyntax
 }
 
@@ -438,7 +411,7 @@ def orElse {pα?} {e : Q($α)} (t₁ : Strictness zα e pα?) (t₂ : MetaM (Str
 def core (pα? : Option Q(PartialOrder $α)) (e : Q($α)) : MetaM (Strictness zα e pα?) := do
   let mut result := .none
   trace[Tactic.positivity] "trying to prove positivity of {e}"
-  for ext in ← (positivityExt.getState (← getEnv)).2.getMatch e do
+  for ext in ← (positivityExt.getState (← getEnv)).getMatch e do
     try
       result ← orElse result <| ext.eval zα pα? e
     catch err =>
