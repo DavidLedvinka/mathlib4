@@ -4995,6 +4995,7 @@ public import Mathlib.Lean.Meta
 public import Mathlib.Lean.Meta.Basic
 public import Mathlib.Lean.Meta.CongrTheorems
 public import Mathlib.Lean.Meta.DiscrTree
+public import Mathlib.Lean.Meta.DiscrTreeExt
 public import Mathlib.Lean.Meta.KAbstractPositions
 public import Mathlib.Lean.Meta.RefinedDiscrTree
 public import Mathlib.Lean.Meta.RefinedDiscrTree.Basic
