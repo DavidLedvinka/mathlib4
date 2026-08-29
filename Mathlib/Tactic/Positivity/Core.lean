@@ -94,14 +94,6 @@ structure PositivityExt where
   eval {u : Level} {α : Q(Type u)} (zα : Q(Zero $α)) (pα? : Option Q(PartialOrder $α)) (e : Q($α)) :
     MetaM (Strictness zα e pα?)
 
-/-- Read a `positivity` extension from a declaration of the right type. -/
-def mkPositivityExt (n : Name) : ImportM PositivityExt :=
-  DiscrTreeExt.evalDecl PositivityExt ``PositivityExt n
-
-/-- Each `positivity` extension is labelled with a collection of patterns
-which determine the expressions to which it should be applied. -/
-abbrev Entry := DiscrTreeExt.Entry
-
 /-- Environment extensions for `positivity` declarations -/
 initialize positivityExt : DiscrTreeExt.EnvExt PositivityExt ←
   DiscrTreeExt.initializeEnvExt ``PositivityExt
