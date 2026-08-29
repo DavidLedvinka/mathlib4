@@ -65,17 +65,6 @@ structure NormNumExt where
 
 variable {u : Level}
 
-/-- Read a `norm_num` extension from a declaration of the right type. -/
-def mkNormNumExt (n : Name) : ImportM NormNumExt :=
-  DiscrTreeExt.evalDecl NormNumExt ``NormNumExt n
-
-/-- Each `norm_num` extension is labelled with a collection of patterns
-which determine the expressions to which it should be applied. -/
-abbrev Entry := DiscrTreeExt.Entry
-
-/-- The state of the `norm_num` extension environment -/
-abbrev NormNums := DiscrTreeExt.State NormNumExt
-
 /-- Environment extensions for `norm_num` declarations -/
 initialize normNumExt : DiscrTreeExt.EnvExt NormNumExt ←
   DiscrTreeExt.initializeEnvExt ``NormNumExt
@@ -147,20 +136,6 @@ def eval (e : Expr) (post := false) : MetaM Simp.Result := do
   if e.isExplicitNumber then return { expr := e }
   let ⟨_, _, e⟩ ← inferTypeQ' e
   (← derive e post).toSimpResult
-
-/-- Mark a `norm_num` extension as erased without checking that it is registered. -/
-def NormNums.eraseCore (d : NormNums) (declName : Name) : NormNums :=
-  DiscrTreeExt.State.eraseCore d declName
-
-/--
-Erase a name marked as a `norm_num` attribute.
-
-Check that it does in fact have the `norm_num` attribute by making sure it names a `NormNumExt`
-found somewhere in the state's tree, and is not erased.
--/
-def NormNums.erase {m : Type → Type} [Monad m] [MonadError m] (d : NormNums) (declName : Name) :
-    m NormNums :=
-  DiscrTreeExt.State.eraseDecl d (·.name) `norm_num declName
 
 initialize registerBuiltinAttribute {
   name := `norm_num

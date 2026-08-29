@@ -46,7 +46,6 @@ variable {α : Type}
 
 /-- Return the declaration values whose patterns match `e`, without filtering erased
 declarations. -/
-@[inline]
 def State.getMatch (state : State α) (e : Expr) : MetaM (Array α) := state.tree.getMatch e
 
 /-- Mark `declName` as erased without checking that it is registered. -/
