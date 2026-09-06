@@ -72,6 +72,8 @@ instance orderBot [Preorder β] [OrderBot β] : OrderBot (α →o β) where
 instance instTopOrderHom [Preorder β] [OrderTop β] : Top (α →o β) where
   top := const α ⊤
 
+attribute [to_dual existing instTopOrderHom] instBotOfOrderBot
+
 instance orderTop [Preorder β] [OrderTop β] : OrderTop (α →o β) where
   le_top _ _ := le_top
 
@@ -94,6 +96,8 @@ theorem coe_iInf {ι : Sort*} [CompleteLattice β] (f : ι → α →o β) :
 
 instance [CompleteLattice β] : SupSet (α →o β) where
   sSup s := ⟨fun x => ⨆ f ∈ s, (f :) x, fun _ _ h => iSup₂_mono fun f _ => f.mono h⟩
+
+attribute [to_dual existing] instSupSet
 
 @[simp]
 theorem sSup_apply [CompleteLattice β] (s : Set (α →o β)) (x : α) :
