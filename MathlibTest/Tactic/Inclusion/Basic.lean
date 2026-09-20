@@ -93,6 +93,23 @@ example {x : ℝ} (hx₀ : x ≤ 3) (hx₁ : x ≤ 2) (hx₂ : 0 ≤ x) (hx₃ :
 
 end Hypotheses
 
+section Division
+
+-- Check the computed endpoints as well as the membership proofs below.
+example : IntervalDyadicReal.div ⟨1, 1⟩ ⟨3, 3⟩ 3 =
+    ⟨some (Dyadic.ofIntWithPrec 1 2), some (Dyadic.ofIntWithPrec 3 3)⟩ := by rfl
+
+example : IntervalDyadicReal.div ⟨1, 2⟩ ⟨0, 3⟩ 4 = Interval.Ici 0 := by rfl
+
+example : IntervalDyadicReal.div ⟨1, 2⟩ ⟨some (-1), 1⟩ 4 = Interval.univ Dyadic := by rfl
+
+example : IntervalDyadicReal.div ⟨0, 0⟩ (Interval.univ Dyadic) 4 =
+    Interval.singleton 0 := by rfl
+
+example : IntervalDyadicReal.div ⟨1, 2⟩ ⟨0, 0⟩ 0 = Interval.singleton 0 := by rfl
+
+end Division
+
 section Arithmetic
 
 example {x : ℝ} (hx : x ∈ (⟨1, 2⟩ : Interval Dyadic)) : x + x ≤ 4 := by dyadic_interval
@@ -107,6 +124,23 @@ example {x y : ℝ} (hx : x ∈ Set.Icc (-2) 3) (hy : y ∈ Set.Icc (-5) 7) :
     x * y ∈ Set.Icc (-15) 21 := by dyadic_interval
 
 example {x y : ℝ} (hx : 3 ≤ x) (hy : 2 ≤ y) : 6 ≤ x * y := by dyadic_interval
+
+example {x y : ℝ} (hx : x ∈ Set.Icc 1 3) (hy : y ∈ Set.Icc 2 4) :
+    x / y ∈ Set.Icc 0.25 1.5 := by dyadic_interval [prec := 2]
+
+example {x y : ℝ} (hx : x ∈ Set.Icc (-3) 2) (hy : y ∈ Set.Icc (-4) (-2)) :
+    x / y ∈ Set.Icc (-1) 1.5 := by dyadic_interval [prec := 1]
+
+example {x y : ℝ} (hx₀ : 0 ≤ x) (hx₁ : x ≤ 3) (hy : 2 ≤ y) :
+    x / y ∈ Set.Icc 0 1.5 := by dyadic_interval [prec := 1]
+
+example {x y : ℝ} (hx : 0 ≤ x) (hy : 0 ≤ y) : 0 ≤ x / y := by dyadic_interval
+
+example (x : ℝ) : x / 0 = 0 := by dyadic_interval
+
+example (y : ℝ) : 0 / y = 0 := by dyadic_interval
+
+example : (1 : ℝ) / 3 ∈ Set.Icc 0.25 0.375 := by dyadic_interval [prec := 3]
 
 example {x : ℝ} (hx : x ∈ Set.Icc (-2) 1) : -x ∈ Set.Icc (-1) 2 := by dyadic_interval
 
@@ -141,6 +175,10 @@ example {x y : ℝ} (hx : x ≤ 1.25) (hy : 0.5 ≤ y) :
 example {x y : ℝ} (hx₀ : 1 ≤ x) (hx₁ : x ≤ 2) (hy : y ∈ Set.Icc 0.5 1.25) :
     x * y + ((1 / 3 : ℚ) : ℝ) ∈ Set.Icc 0.8 2.9 := by dyadic_interval [prec := 12]
 
+example {x y z : ℝ} (hx₀ : 1 ≤ x) (hx₁ : x ≤ 2) (hy : y ∈ Set.Icc 2 3)
+    (hz : z ∈ Set.Icc (-0.5) 0.25) :
+    (x + 0.5) / y + z * 2 ∈ Set.Icc (-0.5) 1.75 := by dyadic_interval [prec := 4]
+
 end Arithmetic
 
 section Splitting
@@ -167,6 +205,9 @@ example {x y : ℝ} (hx : x ∈ Set.Icc (-2) 3) (hy : y ∈ Set.Icc 1 2) :
 example : (0.12345678901234567890123456789 : ℝ) < 0.1234567890123456789012345679 := by
   dyadic_interval +kernel [prec := 100]
 
+example {x y : ℝ} (hx : x ∈ Set.Icc (-3) 2) (hy : y ∈ Set.Icc 3 4) :
+    x / y + 0.125 ∈ Set.Icc (-0.875) 0.796875 := by dyadic_interval +kernel [prec := 6]
+
 end Kernel
 
 section Native
@@ -178,6 +219,9 @@ example {x y : ℝ} (hx : x ∈ Set.Icc 2 3) (hy : y ∈ Set.Icc 0 1) :
 
 example : (0.12345678901234567890123456789 : ℝ) < 0.1234567890123456789012345679 := by
   dyadic_interval +native [prec := 100]
+
+example {x y : ℝ} (hx : x ∈ Set.Icc 1 3) (hy : y ∈ Set.Icc (-4) (-2)) :
+    x / y ∈ Set.Icc (-1.5) (-0.25) := by dyadic_interval +native [prec := 2]
 
 end Native
 
