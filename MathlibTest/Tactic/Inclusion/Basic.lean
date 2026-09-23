@@ -93,22 +93,27 @@ example {x : ℝ} (hx₀ : x ≤ 3) (hx₁ : x ≤ 2) (hx₂ : 0 ≤ x) (hx₃ :
 
 end Hypotheses
 
-section Division
+section DivisionBounds
 
 -- Check the computed endpoints as well as the membership proofs below.
-example : IntervalDyadicReal.div ⟨1, 1⟩ ⟨3, 3⟩ 3 =
-    ⟨some (Dyadic.ofIntWithPrec 1 2), some (Dyadic.ofIntWithPrec 3 3)⟩ := by rfl
+example : IntervalDyadicReal.div (Interval.singleton 1) (Interval.singleton 3) 3 =
+    Interval.Icc (Dyadic.ofIntWithPrec 1 2) (Dyadic.ofIntWithPrec 3 3) := by rfl
 
-example : IntervalDyadicReal.div ⟨1, 2⟩ ⟨0, 3⟩ 4 = Interval.Ici 0 := by rfl
+example : IntervalDyadicReal.div (Interval.singleton 1) (Interval.singleton (-3)) 3 =
+    Interval.Icc (Dyadic.ofIntWithPrec (-3) 3) (Dyadic.ofIntWithPrec (-1) 2) := by rfl
 
-example : IntervalDyadicReal.div ⟨1, 2⟩ ⟨some (-1), 1⟩ 4 = Interval.univ Dyadic := by rfl
+example : IntervalDyadicReal.div (Interval.Icc 1 2) (Interval.Icc 0 3) 4 = Interval.Ici 0 := by rfl
 
-example : IntervalDyadicReal.div ⟨0, 0⟩ (Interval.univ Dyadic) 4 =
+example : IntervalDyadicReal.div (Interval.Icc 1 2) (Interval.Icc (-1 : Dyadic) 1) 4 =
+    Interval.univ Dyadic := by rfl
+
+example : IntervalDyadicReal.div (Interval.singleton 0) (Interval.univ Dyadic) 4 =
     Interval.singleton 0 := by rfl
 
-example : IntervalDyadicReal.div ⟨1, 2⟩ ⟨0, 0⟩ 0 = Interval.singleton 0 := by rfl
+example : IntervalDyadicReal.div (Interval.Icc 1 2) (Interval.singleton 0) 0 =
+    Interval.singleton 0 := by rfl
 
-end Division
+end DivisionBounds
 
 section Arithmetic
 

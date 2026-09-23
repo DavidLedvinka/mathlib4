@@ -10,8 +10,9 @@ public import Mathlib.Tactic.Inclusion.Extension.IntervalDyadicReal.Rational
 /-!
 # Division for interval_dyadic_real
 
-This file defines directly rounded division of dyadic intervals, using the `prec` parameter for
-the finite output endpoints. Division by zero follows the real-number convention `x / 0 = 0`.
+This file defines division of dyadic intervals, rounding each finite output endpoint once, using
+the `prec` parameter. In particular, it does not first round a reciprocal and then multiply.
+Division by zero follows the real-number convention `x / 0 = 0`.
 -/
 
 @[expose] public section
@@ -42,27 +43,21 @@ theorem map_divBound_le (a b : Option Dyadic) (prec : ℕ) {z : ℝ}
     (hdiv : ∀ x y, a = some x → b = some y → x.toReal / y.toReal ≤ z)
     (hzero : ∀ x, a = some x → b = none → 0 ≤ z) :
     WithBot.map Dyadic.toReal (divBound false a b prec) ≤ z := by
-  cases a with
-  | none => exact bot_le
-  | some a =>
-    cases b with
-    | none => exact WithBot.coe_le_coe.mpr (by simpa using hzero a rfl rfl)
-    | some b =>
-      exact WithBot.coe_le_coe.mpr
-        ((Dyadic.toReal_divDown_le a b prec).trans (hdiv a b rfl rfl))
+  rcases a with _ | a
+  · exact bot_le
+  rcases b with _ | b <;> apply WithBot.coe_le_coe.mpr
+  · simpa using hzero a rfl rfl
+  exact (Dyadic.toReal_divDown_le a b prec).trans (hdiv a b rfl rfl)
 
 theorem le_map_divBound (a b : Option Dyadic) (prec : ℕ) {z : ℝ}
     (hdiv : ∀ x y, a = some x → b = some y → z ≤ x.toReal / y.toReal)
     (hzero : ∀ x, a = some x → b = none → z ≤ 0) :
     z ≤ WithTop.map Dyadic.toReal (divBound true a b prec) := by
-  cases a with
-  | none => exact le_top
-  | some a =>
-    cases b with
-    | none => exact WithTop.coe_le_coe.mpr (by simpa using hzero a rfl rfl)
-    | some b =>
-      exact WithTop.coe_le_coe.mpr
-        ((hdiv a b rfl rfl).trans (Dyadic.le_toReal_divUp a b prec))
+  rcases a with _ | a
+  · exact le_top
+  rcases b with _ | b <;> apply WithTop.coe_le_coe.mpr
+  · simpa using hzero a rfl rfl
+  exact (hdiv a b rfl rfl).trans (Dyadic.le_toReal_divUp a b prec)
 
 /-- Divide dyadic intervals, rounding finite quotient bounds outward to the `2⁻prec` grid.
 
