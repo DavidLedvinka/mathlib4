@@ -158,6 +158,27 @@ theorem measurePreserving_homeomorphUnitSphereProd :
     sub_add_cancel, mul_right_comm, ← ENNReal.ofReal_natCast, ← ENNReal.ofReal_mul, mul_div_cancel₀]
   exacts [(Nat.cast_pos.2 hpos).ne', Nat.cast_nonneg _]
 
+/-- The map `(ω, r) ↦ r • ω` sends the polar product measure to additive Haar measure
+on a nontrivial finite-dimensional real normed space. -/
+theorem measurePreserving_smul_toSphere [Nontrivial E] :
+    MeasurePreserving (fun p : sphere (0 : E) 1 × Ioi (0 : ℝ) ↦ (p.2 : ℝ) • (p.1 : E))
+      (μ.toSphere.prod (volumeIoiPow (dim E - 1))) μ := by
+  simpa [comp_def] using
+    (measurePreserving_subtype_coe (μa := μ) (measurableSet_singleton (0 : E)).compl).comp
+      (μ.measurePreserving_homeomorphUnitSphereProd.symm
+        (homeomorphUnitSphereProd E).toMeasurableEquiv)
+
+/-- The map `(ω, r) ↦ r • ω` is quasi-measure-preserving from the polar product measure
+to additive Haar measure, including when the space is trivial. -/
+@[fun_prop]
+theorem quasiMeasurePreserving_smul_toSphere :
+    QuasiMeasurePreserving (fun p : sphere (0 : E) 1 × Ioi (0 : ℝ) ↦ (p.2 : ℝ) • (p.1 : E))
+      (μ.toSphere.prod (volumeIoiPow (dim E - 1))) μ :=
+  ((measurePreserving_subtype_coe (μa := μ) (measurableSet_singleton (0 : E)).compl).comp
+    (μ.measurePreserving_homeomorphUnitSphereProd.symm
+      (homeomorphUnitSphereProd E).toMeasurableEquiv)).quasiMeasurePreserving.mono_right
+        Measure.restrict_le_self.absolutelyContinuous
+
 /-- An auxiliary lemma for `toSphereBallBound_mul_measure_unitBall_le_toSphere_ball`.
 The estimate in this lemma is highly suboptimal.
 For a non-private lemma, we should aim for a more precise and a more general fact
