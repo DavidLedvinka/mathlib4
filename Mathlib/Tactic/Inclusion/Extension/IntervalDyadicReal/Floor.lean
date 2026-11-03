@@ -19,15 +19,15 @@ This file defines floor and ceil operations from dyadic real intervals to intege
 namespace Inclusion.IntervalDyadicReal
 
 @[inclusion_op interval_dyadic_real]
-theorem floor_mem {x : ℝ} {I : Interval Dyadic} (hx : x ∈ I) :
-    ⌊x⌋ ∈ I.map Dyadic.floor := by
-  simpa only [Interval.map_map, Function.comp_def, Dyadic.floor_toReal] using
+theorem intFloor_mem {x : ℝ} {I : Interval Dyadic} (hx : x ∈ I) :
+    ⌊x⌋ ∈ I.map Dyadic.intFloor := by
+  simpa [Interval.map_map, Function.comp_def] using
     Interval.map_mem Int.floor_mono (mem_iff_mem_map.mp hx)
 
 @[inclusion_op interval_dyadic_real]
-theorem ceil_mem {x : ℝ} {I : Interval Dyadic} (hx : x ∈ I) :
-    ⌈x⌉ ∈ I.map Dyadic.ceil := by
-  simpa only [Interval.map_map, Function.comp_def, Dyadic.ceil_toReal] using
+theorem intCeil_mem {x : ℝ} {I : Interval Dyadic} (hx : x ∈ I) :
+    ⌈x⌉ ∈ I.map Dyadic.intCeil := by
+  simpa [Interval.map_map, Function.comp_def] using
     Interval.map_mem Int.ceil_mono (mem_iff_mem_map.mp hx)
 
 end Inclusion.IntervalDyadicReal

@@ -12,7 +12,8 @@ public import Mathlib.Data.Rat.Floor
 /-!
 # Floor and ceil of dyadic rationals
 
-This file defines integer floor and ceil for dyadic rationals using bit shifts.
+This file defines integer floor and ceil for dyadic rationals using bit shifts and provides a
+`FloorRing Dyadic` instance using these operations.
 -/
 
 @[expose] public section
@@ -20,55 +21,58 @@ This file defines integer floor and ceil for dyadic rationals using bit shifts.
 namespace Dyadic
 
 /-- Round a dyadic rational down to an integer. -/
-def floor : Dyadic → ℤ
+def intFloor : Dyadic → ℤ
   | .zero => 0
   | .ofOdd n (.ofNat k) _ => n >>> k
   | .ofOdd n (.negSucc k) _ => n <<< (k + 1)
 
 /-- Round a dyadic rational up to an integer. -/
-def ceil : Dyadic → ℤ
+def intCeil : Dyadic → ℤ
   | .zero => 0
   | .ofOdd n (.ofNat 0) _ => n
   | .ofOdd n (.ofNat (k + 1)) _ => (n >>> (k + 1)) + 1
   | .ofOdd n (.negSucc k) _ => n <<< (k + 1)
 
 @[simp]
-theorem floor_toRat (x : Dyadic) : ⌊x.toRat⌋ = x.floor := by
+theorem intFloor_toRat (x : Dyadic) : ⌊x.toRat⌋ = x.intFloor := by
   cases x with
-  | zero => simp [floor]
+  | zero => simp [intFloor]
   | ofOdd n k hn =>
     cases k with
-    | ofNat k => simp [floor, toRat, Rat.floor_def', Int.shiftRight_eq_div_pow]
+    | ofNat k => simp [intFloor, toRat, Rat.floor_def', Int.shiftRight_eq_div_pow]
     | negSucc k =>
-      simp only [floor, toRat, Int.floor_intCast, Int.shiftLeft_eq,
-        Nat.cast_pow, Nat.cast_ofNat]
+      rw [intFloor, toRat, Int.floor_intCast]
+      simp [Int.shiftLeft_eq]
 
 @[simp]
-theorem ceil_toRat (x : Dyadic) : ⌈x.toRat⌉ = x.ceil := by
+theorem intCeil_toRat (x : Dyadic) : ⌈x.toRat⌉ = x.intCeil := by
   cases x with
-  | zero => simp [ceil]
+  | zero => simp [intCeil]
   | ofOdd n k hn =>
-    cases k with
-    | ofNat k =>
-      cases k with
-      | zero => simp [ceil, toRat]
-      | succ k =>
-        have h : ¬ (2 : ℤ) ^ (k + 1) ∣ n := by
-          intro h
-          have : (2 : ℤ) ∣ n := (dvd_pow_self 2 (by simp)).trans h
-          simp [Int.dvd_iff_emod_eq_zero, hn] at this
-        simp [ceil, toRat, Rat.ceil_def', Int.shiftRight_eq_div_pow, Int.neg_ediv, h,
-          Int.sign_eq_one_of_pos (show (0 : ℤ) < 2 ^ (k + 1) by positivity), Int.add_comm]
-    | negSucc k =>
-      simp only [ceil, toRat, Int.ceil_intCast, Int.shiftLeft_eq,
-        Nat.cast_pow, Nat.cast_ofNat]
+    rcases k with (_ | k) | k
+    · simp [intCeil, toRat]
+    · rw [(Int.ceil_eq_floor_add_one_iff_notMem _).mpr ?_, intFloor_toRat]
+      · rfl
+      · rintro ⟨z, hz⟩
+        have := congrArg Rat.den hz.symm
+        simp [toRat] at this
+    · rw [intCeil, toRat, Int.ceil_intCast]
+      simp [Int.shiftLeft_eq]
+
+instance : FloorRing Dyadic where
+  floor := intFloor
+  ceil := intCeil
+  gc_coe_floor z x := by
+    rw [← toRat_le_toRat_iff, toRat_intCast, ← Int.le_floor, intFloor_toRat]
+  gc_ceil_coe x z := by
+    rw [← toRat_le_toRat_iff, toRat_intCast, ← Int.ceil_le, intCeil_toRat]
 
 @[simp]
-theorem floor_toReal (x : Dyadic) : ⌊x.toReal⌋ = x.floor := by
+theorem intFloor_toReal (x : Dyadic) : ⌊x.toReal⌋ = x.intFloor := by
   simp [toReal]
 
 @[simp]
-theorem ceil_toReal (x : Dyadic) : ⌈x.toReal⌉ = x.ceil := by
+theorem intCeil_toReal (x : Dyadic) : ⌈x.toReal⌉ = x.intCeil := by
   simp [toReal]
 
 end Dyadic
