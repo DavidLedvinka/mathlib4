@@ -7,11 +7,11 @@ module
 
 public meta import Mathlib.Tactic.Inclusion.Core.Elab
 public meta import Mathlib.Tactic.Inclusion.Extension.Core.Core
+public meta import Mathlib.Tactic.Inclusion.Extension.IntervalDyadicReal.Floor
 public meta import Mathlib.Tactic.Inclusion.Extension.IntervalDyadicReal.Hypotheses
+public meta import Mathlib.Tactic.Inclusion.Extension.IntervalDyadicReal.Rational
 public meta import Mathlib.Tactic.Inclusion.Extension.IntervalInt.Basic
 public meta import Mathlib.Tactic.Inclusion.Extension.IntervalInt.Hypotheses
-
-import Mathlib.Tactic.Inclusion.Extension.IntervalDyadicReal.Rational
 
 /-!
 # The `dyadic_interval` tactic

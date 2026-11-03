@@ -15,10 +15,10 @@ namespace Inclusion.Tests
 example : Real.exp (-100) < 1e-43 := by dyadic_interval [prec := 145]
 
 example : ⌊Real.exp 30⌋ = 10686474581524 := by
-  rw [Int.floor_eq_iff]; constructor <;> dyadic_interval [prec := 1]
+  dyadic_interval [prec := 1]
 
 example : ⌊Real.exp (Real.exp 2)⌋ = 1618 := by
-  rw [Int.floor_eq_iff]; constructor <;> dyadic_interval [prec := 15]
+  dyadic_interval [prec := 15]
 
 example {x : ℝ} (hx : x ≤ 0) : Real.exp x ≤ 1 := by dyadic_interval
 
@@ -50,11 +50,9 @@ example : 2 < Real.exp 1 := by dyadic_interval [prec := 1]
 example : Real.exp 1 < 3 := by dyadic_interval [prec := 2]
 
 example : ⌊Real.exp 1⌋ = 2 := by
-  rw [Int.floor_eq_iff]
   dyadic_interval [prec := 2]
 
 example : ⌈Real.exp 1⌉ = 3 := by
-  rw [Int.ceil_eq_iff]
   dyadic_interval [prec := 1]
 
 example : round (Real.exp 1) = 3 := by

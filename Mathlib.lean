@@ -4039,6 +4039,7 @@ public import Mathlib.Data.DFinsupp.Submonoid
 public import Mathlib.Data.DFinsupp.WellFounded
 public import Mathlib.Data.DList.Instances
 public import Mathlib.Data.Dyadic
+public import Mathlib.Data.Dyadic.Floor
 public import Mathlib.Data.ENNReal.Action
 public import Mathlib.Data.ENNReal.Basic
 public import Mathlib.Data.ENNReal.BigOperators
@@ -7733,6 +7734,7 @@ public import Mathlib.Tactic.Inclusion.Extension.Interval
 public import Mathlib.Tactic.Inclusion.Extension.IntervalDyadicReal.Basic
 public import Mathlib.Tactic.Inclusion.Extension.IntervalDyadicReal.BinarySplit
 public import Mathlib.Tactic.Inclusion.Extension.IntervalDyadicReal.Exp
+public import Mathlib.Tactic.Inclusion.Extension.IntervalDyadicReal.Floor
 public import Mathlib.Tactic.Inclusion.Extension.IntervalDyadicReal.Hypotheses
 public import Mathlib.Tactic.Inclusion.Extension.IntervalDyadicReal.Init
 public import Mathlib.Tactic.Inclusion.Extension.IntervalDyadicReal.Rational

@@ -35,11 +35,26 @@ example {x : ℤ} (hx : x ∈ Set.Ioo (-3) 2) :
 
 example {x : ℤ} (hx : x < -2) : x ^ 3 ≤ -27 ∧ 81 ≤ x ^ 4 := by dyadic_interval
 
--- Integer arithmetic before casting and real arithmetic after casting share the enclosure of `n`.
 example {x : ℝ} {n : ℤ} (hx : x ∈ Set.Icc 1 2) (hn : n ∈ Set.Ioo (-2) 3) :
     x * ((n ^ 2 + 1 : ℤ) : ℝ) + (n : ℝ) ^ 2 ∈ Set.Icc 1 14 := by dyadic_interval
 
 example {n : ℤ} (hn : n < -2) : 9 ≤ (n : ℝ) ^ 2 := by dyadic_interval
+
+example : ⌊(0 : ℝ)⌋ = 0 ∧ ⌈(3 : ℝ)⌉ = 3 ∧ ⌊(-4 : ℝ)⌋ = -4 := by dyadic_interval
+
+example {x : ℝ} (hx : x ∈ Set.Icc (-2.5) 1.25) :
+    ⌊x⌋ ∈ Set.Icc (-3) 1 ∧ ⌈x⌉ ∈ Set.Icc (-2) 2 := by dyadic_interval [prec := 2]
+
+example {x y : ℝ} (hx : -1.25 ≤ x) (hy : y ≤ -0.25) :
+    -2 ≤ ⌊x⌋ ∧ ⌈y⌉ ≤ 0 := by dyadic_interval [prec := 2]
+
+example {n : ℤ} (hn : n ∈ Set.Icc (-2) 3) :
+    ⌊(n : ℝ) + 0.5⌋ ∈ Set.Icc (-2) 3 ∧ ⌈(n : ℝ) + 0.5⌉ ∈ Set.Icc (-1) 4 := by
+  dyadic_interval [prec := 1]
+
+example {x : ℝ} {n : ℤ} (hx : x ∈ Set.Icc (-1.5) 2.25) (hn : n ∈ Set.Icc 1 2) :
+    ((⌊x⌋ * n + ⌈x⌉ : ℤ) : ℝ) + x ∈ Set.Icc (-6.5) 9.25 := by
+  dyadic_interval [prec := 2]
 
 end Integers
 

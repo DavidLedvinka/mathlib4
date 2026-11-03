@@ -75,6 +75,10 @@ theorem Interval.mem_map_iff [Preorder β] (f : α → β) {x : β} {I : Interva
   simp [Interval.map, WithBot.le_coe_iff, WithTop.coe_le_iff,
     WithBot.map_eq_some_iff, WithTop.map_eq_some_iff]
 
+theorem Interval.map_mem [Preorder α] [Preorder β] {f : α → β} (hf : Monotone f)
+    {x : α} {I : Interval α} (hx : x ∈ I) : f x ∈ I.map f :=
+  ⟨hf.withBot_map hx.1, hf.withTop_map hx.2⟩
+
 /-- The interval unbounded on both sides. -/
 def Interval.univ (α : Type*) : Interval α := ⟨⊥, ⊤⟩
 
