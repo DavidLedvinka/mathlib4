@@ -120,6 +120,23 @@ def IType.synthUniv (iType : IType) : MetaM Expr := do
 def mkIntervalBoolRefl (b : Expr) : Expr :=
   mkApp2 (mkConst ``Eq.refl [.succ .zero]) (mkConst ``IntervalBool) b
 
+/-- Expand function-valued refinements and universal inclusions, and simplify applications of
+constant functions. Leave numerical definitions folded and preserve sharing of nonconstant function
+bounds. -/
+def reduceFunctionInclusions (e : Expr) : MetaM Expr := do
+  let isConstantFunction (e : Expr) := e.isLambda && !e.bindingBody!.hasLooseBVars
+  Meta.transform e (post := fun e => do
+    let functionValued := match_expr e with
+      | Refine.refine setType _ _ _ _ _ => setType.isForall
+      | Univ.univ setType _ _ _ => setType.isForall
+      | _ => false
+    let e ← if functionValued then Core.betaReduce (← whnf e) else pure e
+    -- Propagate constant function bounds through the closure created for an inclusion variable.
+    if e.isHeadBetaTarget &&
+        (isConstantFunction e.getAppFn || e.getAppArgs.any isConstantFunction) then
+      return .visit e.headBeta
+    return .done e)
+
 /-- Given an `ExprInclusion` `inc` for `goal`, and a proof
 `inclusionProof : inc.inclusion = IntervalBool.true` create a proof of `goal`. -/
 def ExprInclusion.mkGoalProof (inc : ExprInclusion) (goal inclusionProof : Expr) : Expr :=
