@@ -180,6 +180,7 @@ public import Mathlib.Tactic.Inclusion.Core.ToSet
 public import Mathlib.Tactic.Inclusion.Core.Types
 public import Mathlib.Tactic.Inclusion.Extension.Core.Core
 public import Mathlib.Tactic.Inclusion.Extension.Core.Init
+public import Mathlib.Tactic.Inclusion.Extension.Interval
 public import Mathlib.Tactic.Inclusion.Extension.Interval.Basic
 public import Mathlib.Tactic.Inclusion.Extension.Interval.BinarySplit
 public import Mathlib.Tactic.Inclusion.Extension.IntervalDyadicReal.Basic
