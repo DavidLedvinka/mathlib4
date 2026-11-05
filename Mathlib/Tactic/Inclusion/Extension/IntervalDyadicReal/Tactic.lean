@@ -7,6 +7,7 @@ module
 
 public meta import Mathlib.Tactic.Inclusion.Core.Elab
 public meta import Mathlib.Tactic.Inclusion.Extension.Core.Core
+public meta import Mathlib.Tactic.Inclusion.Extension.IntervalDyadicReal.Function
 public meta import Mathlib.Tactic.Inclusion.Extension.IntervalDyadicReal.Hypotheses
 public meta import Mathlib.Tactic.Inclusion.Extension.IntervalInt.Basic
 public meta import Mathlib.Tactic.Inclusion.Extension.IntervalInt.Hypotheses

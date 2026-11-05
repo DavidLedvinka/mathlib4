@@ -115,9 +115,9 @@ def mkNDIVarExt (family : Name) (iType : IType)
     let iExpr : IExpr := ⟨iType, e⟩
     return (← mkIVar iExpr (← mkCover?)).toExprInclusionBody
 
-/-- Return the inclusion variable registered for `e`, if there is one. -/
-def findIVar? (e : Expr) : HypothesisM (Option IVar) := do
-  return (← read).iVarsMap[e]?
+/-- Return the requested inclusion expression for `e`, if there is one. -/
+def findIExpr? (e : Expr) : HypothesisM (Option IExpr) := do
+  return (← read).iExprs[e]?
 
 /-- Check that two inclusion types are definitionally equal, including their chosen `ToSet`
 instances. -/
@@ -129,17 +129,24 @@ def ensureOutputType (type expectedType : IType) : MetaM Unit := do
   unless ← pureIsDefEq type.toSetInst expectedType.toSetInst do
     throwError "Inclusion uses an unexpected `ToSet` instance"
 
-/-- Construct a closed inclusion body for an expression argument of a hypothesis rule. -/
+/-- Check that an inclusion computation is closed after abstracting the current bound variables.
+In particular, variables from the tactic's original local context are not permitted. -/
+def checkHypInclusionClosed (e : Expr) : HypothesisM Unit := do
+  let e ← mkLambdaFVars (← read).boundVars e
+  if e.hasFVar then
+    throwError "The inclusion hypothesis {e} contains a free variable"
+  if e.hasMVar then
+    throwError "The inclusion hypothesis {e} contains a metavariable"
+
+/-- Construct an inclusion body for an expression argument of a hypothesis rule. Its computation
+must be closed, except for bound variables that the caller will abstract. -/
 def mkHypExprInclusionBody (e : Expr) : HypothesisM ExprInclusionBody := do
   let ctx ← read
   let inclusionContext := { ctx.toContext with noIVars := true }
   let (body, inclusionState) ← (mkExprInclusionBody e).runWith inclusionContext
   unless inclusionState.iVars.isEmpty do
     throwError "The inclusion for {e} depends on inclusion variables"
-  if body.inclusionBody.hasFVar then
-    throwError "The inclusion hypothesis generated from {e} contains a free variable"
-  if body.inclusionBody.hasMVar then
-    throwError "The inclusion hypothesis generated from {e} contains a metavariable"
+  checkHypInclusionClosed body.inclusionBody
   return body
 
 /-- Add the inclusion hypothesis `body` for `iExpr`. -/
@@ -148,5 +155,17 @@ def addInclusionHyp (iExpr : IExpr) (body : ExprInclusionBody) : HypothesisM Uni
   modify fun state => { state with inclusions := state.inclusions.alter iExpr.expr fun
     | some hyps => hyps.push body
     | none => #[body] }
+
+/-- Run the hypothesis extensions on `h` for just `iExpr`, without changing the caller's requests
+or accumulated hypotheses. The caller must abstract `boundVars` in any returned computation. -/
+def deriveHypBodies (iExpr : IExpr) (h : Expr) (boundVars : Array Expr := #[]) :
+    HypothesisM (Array ExprInclusionBody) := do
+  let ctx ← read
+  let ctx := { ctx with
+    iExprs := ({} : ExprMap IExpr).insert iExpr.expr iExpr
+    iVars := #[]
+    boundVars := ctx.boundVars ++ boundVars }
+  let (_, state) ← liftM <| StateT.run (ReaderT.run (runHypothesisExts h) ctx) {}
+  return state.inclusions[iExpr.expr]?.getD #[]
 
 end Inclusion

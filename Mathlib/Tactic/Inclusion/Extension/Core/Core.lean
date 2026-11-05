@@ -33,9 +33,9 @@ def instMembershipHyp : HypothesisExt where
   derive h := do
     let type ← instantiateMVars (← inferType h)
     let some (expr, set, _) := toSetMem? type | failure
-    if set.hasFVar || set.hasMVar then failure
-    let some iVar ← findIVar? expr | failure
-    addInclusionHyp iVar.iExpr ⟨set, h⟩
+    let some iExpr ← findIExpr? expr | failure
+    checkHypInclusionClosed set
+    addInclusionHyp iExpr ⟨set, h⟩
 
 /-- `HypothesisExt` for conjunction hypotheses. -/
 @[hypothesis_ext _ ∧ _]

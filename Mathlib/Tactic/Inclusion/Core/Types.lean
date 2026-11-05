@@ -134,10 +134,14 @@ section HypothesisM
 
 /-- The fixed context of the `HypothesisM` monad. -/
 structure HypothesisM.Context extends InclusionM.Context where
-  /-- The inclusion variables indexed by their associated expressions. -/
-  iVarsMap : ExprMap IVar
+  /-- The expressions for which inclusion hypotheses are requested. These need not themselves
+  be inclusion variables: an extension can request bounds for an application under a binder. -/
+  iExprs : ExprMap IExpr
   /-- The inclusion variables whose hypotheses are being constructed. -/
   iVars : Array IVar
+  /-- Variables that will be abstracted when returning from a scoped hypothesis computation.
+  Inclusion hypotheses must be closed after abstracting these variables. -/
+  boundVars : Array Expr := #[]
 
 /-- The mutable state of the `HypothesisM` monad. -/
 structure HypothesisM.State where
@@ -158,9 +162,9 @@ computation. -/
 def HypothesisM.run {α : Type} (x : HypothesisM α) : InclusionM α := do
   let inclusionContext ← read
   let inclusionState ← get
-  let iVarsMap := inclusionState.iVars
-  let iVars := iVarsMap.valuesArray
-  liftM <| StateT.run' (ReaderT.run x { toContext := inclusionContext, iVarsMap, iVars }) {}
+  let iVars := inclusionState.iVars.valuesArray
+  let iExprs := iVars.foldl (fun es v => es.insert v.expr v.iExpr) {}
+  liftM <| StateT.run' (ReaderT.run x { toContext := inclusionContext, iExprs, iVars }) {}
 
 end HypothesisM
 
