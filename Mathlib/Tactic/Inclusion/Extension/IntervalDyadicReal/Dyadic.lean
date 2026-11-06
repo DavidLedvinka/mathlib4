@@ -8,6 +8,7 @@ module
 public import Mathlib.Algebra.Ring.Hom.Defs
 public import Mathlib.Algebra.Ring.Rat
 public import Mathlib.Data.Dyadic.Basic
+public import Mathlib.Data.Rat.Floor
 public import Mathlib.Order.Hom.Basic
 
 import Mathlib.Algebra.Field.Basic
@@ -20,8 +21,8 @@ set_option doc.verso.suggestions false
 /-!
 # Dyadic rationals
 
-This file provides general API for Dyadic rationals that are used in Mathlib but not available in
-core.
+This file provides general API for Dyadic rationals that are used in the Inclusion tactic but not
+available in core.
 -/
 
 @[expose] public section
@@ -64,6 +65,48 @@ def toRatOrderEmbedding : Dyadic ↪o ℚ where
   toFun := toRat
   inj' := fun _ _ ↦ toRat_inj.mp
   map_rel_iff' := toRat_le_toRat_iff
+
+/-- The greatest integer less than or equal to a dyadic rational. -/
+@[inline]
+def floor : Dyadic → ℤ
+  | .zero => 0
+  | .ofOdd n (.ofNat k) _ => n >>> k
+  | .ofOdd n (.negSucc k) _ => n <<< (k + 1)
+
+@[simp]
+theorem floor_toRat (x : Dyadic) : ⌊x.toRat⌋ = floor x := by
+  rcases x with _ | ⟨n, k, hn⟩
+  · rfl
+  cases k with
+  | ofNat k => simp [floor, toRat, Rat.floor_def', Int.shiftRight_eq_div_pow]
+  | negSucc k =>
+    rw [toRat, Int.floor_intCast]
+    simp [floor, Int.shiftLeft_eq]
+
+/-- The least integer greater than or equal to a dyadic rational. At positive precision the
+odd numerator guarantees a nonintegral input, so the ceiling is one more than the floor. -/
+@[inline]
+def ceil : Dyadic → ℤ
+  | .zero => 0
+  | .ofOdd n (.ofNat 0) _ => n
+  | .ofOdd (.ofNat n) (.ofNat (k + 1)) _ => .ofNat ((n >>> (k + 1)) + 1)
+  | .ofOdd (.negSucc n) (.ofNat (k + 1)) _ => Int.negOfNat (n >>> (k + 1))
+  | .ofOdd n (.negSucc k) _ => n <<< (k + 1)
+
+@[simp]
+theorem ceil_toRat (x : Dyadic) : ⌈x.toRat⌉ = ceil x := by
+  trans x.toRat.ceil
+  · exact (Rat.ceil_eq_neg_floor_neg _).symm
+  rcases x with _ | ⟨n, k, hn⟩
+  · rfl
+  rcases k with k | k
+  · cases k with
+    | zero => simp [ceil, toRat, Rat.ceil]
+    | succ k =>
+      rw [toRat, Rat.ceil, ite_eq_right (by simp), ← Int.shiftRight_eq_div_pow]
+      cases n <;> simp [ceil, Int.negOfNat_eq, ← Int.natCast_shiftRight]
+  · rw [toRat, Rat.ceil_intCast]
+    simp [ceil, Int.shiftLeft_eq]
 
 /-- One unit on the dyadic grid with precision `prec`. -/
 def step (prec : Int) : Dyadic := .ofOdd 1 prec (by decide)

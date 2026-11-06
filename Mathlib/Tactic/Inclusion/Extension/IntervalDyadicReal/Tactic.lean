@@ -11,6 +11,7 @@ public meta import Mathlib.Tactic.Inclusion.Extension.IntervalDyadicReal.Hypothe
 public meta import Mathlib.Tactic.Inclusion.Extension.IntervalInt.Basic
 public meta import Mathlib.Tactic.Inclusion.Extension.IntervalInt.Hypotheses
 
+import Mathlib.Tactic.Inclusion.Extension.IntervalDyadicReal.Floor
 import Mathlib.Tactic.Inclusion.Extension.IntervalDyadicReal.Rational
 
 /-!

@@ -72,6 +72,27 @@ example : (1e12 : ℝ) - 999999999999 = 1 := by dyadic_interval
 
 end Scientific
 
+section Floor
+
+example : ⌊(-1.25 : ℝ)⌋ = -2 ∧ ⌈(-1.25 : ℝ)⌉ = -1 := by dyadic_interval [prec := 2]
+
+example : ⌊(0 : ℝ)⌋ + ⌈(-8 : ℝ)⌉ = -8 := by dyadic_interval
+
+example {x : ℝ} (hx : x ∈ Set.Icc 1.25 1.75) : ⌊x⌋ = 1 ∧ ⌈x⌉ = 2 := by
+  dyadic_interval [prec := 2]
+
+example {x : ℝ} (hx : x ≤ -1.25) : ⌊x⌋ ≤ -2 ∧ ⌈x⌉ ≤ -1 := by dyadic_interval [prec := 2]
+
+example {x : ℝ} (hx : 3.25 ≤ x) : 3 ≤ ⌊x⌋ ∧ 4 ≤ ⌈x⌉ := by dyadic_interval [prec := 2]
+
+example {x y : ℝ} (hx : x ∈ Set.Icc (-1.75) (-1.25)) (hy : y ∈ Set.Icc 2.25 2.75) :
+    ⌊x⌋ * ⌈y⌉ + ⌈x + y⌉ ∈ Set.Icc (-5) (-4) := by dyadic_interval [prec := 2]
+
+example {x : ℝ} (hx : x ∈ Set.Icc 1.25 1.75) : (⌊x⌋ : ℝ) + x ∈ Set.Icc 2.25 2.75 := by
+  dyadic_interval [prec := 2]
+
+end Floor
+
 section Sets
 
 example {x : ℝ} (hx : x ∈ Set.Ici 1) : x ∈ Set.Ici 1 := by dyadic_interval
@@ -215,6 +236,9 @@ example {x y : ℝ} (hx : x ∈ Set.Icc (-2) 3) (hy : y ∈ Set.Icc 1 2) :
 example : (0.12345678901234567890123456789 : ℝ) < 0.1234567890123456789012345679 := by
   dyadic_interval +kernel [prec := 100]
 
+example {x : ℝ} (hx : x ∈ Set.Icc 1.25 1.5) :
+    (⌊x * x⌋ + ⌈x + 0.5⌉) ^ 2 ∈ Set.Icc 9 16 := by dyadic_interval +kernel [prec := 2]
+
 end Kernel
 
 section Native
@@ -226,6 +250,9 @@ example {x y : ℝ} (hx : x ∈ Set.Icc 2 3) (hy : y ∈ Set.Icc 0 1) :
 
 example : (0.12345678901234567890123456789 : ℝ) < 0.1234567890123456789012345679 := by
   dyadic_interval +native [prec := 100]
+
+example {x : ℝ} (hx : x ∈ Set.Icc (-1.75) (-1.25)) :
+    |⌊x⌋| + ⌈x * x⌉ ∈ Set.Icc 4 6 := by dyadic_interval +native [prec := 2]
 
 end Native
 
