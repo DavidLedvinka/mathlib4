@@ -218,17 +218,10 @@ theorem le_iInf₂_lintegral {ι : Sort*} {ι' : ι → Sort*} (f : ∀ i, ι' i
 
 theorem lintegral_mono_ae {f g : α → ℝ≥0∞} (h : ∀ᵐ a ∂μ, f a ≤ g a) :
     ∫⁻ a, f a ∂μ ≤ ∫⁻ a, g a ∂μ := by
-  rcases exists_measurable_superset_of_null h with ⟨t, hts, ht, ht0⟩
-  have : ∀ᵐ x ∂μ, x ∉ t := measure_eq_zero_iff_ae_notMem.1 ht0
-  rw [lintegral, lintegral]
-  refine iSup₂_le fun s hfs ↦ le_iSup₂_of_le (s.restrict tᶜ) ?_ ?_
-  · intro a
-    by_cases h : a ∈ t <;>
-      simp only [restrict_apply s ht.compl, mem_compl_iff, h, not_true, not_false_eq_true,
-        indicator_of_notMem, zero_le, not_false_eq_true, indicator_of_mem]
-    exact le_trans (hfs a) (by_contradiction fun hnfg => h (hts hnfg))
-  · exact le_of_eq <| SimpleFunc.lintegral_congr <| this.mono fun a hnt => by
-      simp [restrict_apply s ht.compl, hnt]
+  rw [lintegral_def, lintegral_def]
+  refine iSup₂_le fun φ hφ ↦ ?_
+  obtain ⟨ψ, hψ, hφψ⟩ := φ.exists_le_of_ae_le (h.mono fun x hx ↦ (hφ x).trans hx)
+  exact le_iSup₂_of_le ψ hψ (SimpleFunc.lintegral_congr hφψ).le
 
 /-- Lebesgue integral over a set is monotone in function.
 

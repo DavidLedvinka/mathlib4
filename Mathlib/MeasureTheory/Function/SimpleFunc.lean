@@ -247,6 +247,19 @@ theorem piecewise_same (f : α →ₛ β) {s : Set α} (hs : MeasurableSet s) :
   classical
   exact coe_injective <| Set.piecewise_same _ _
 
+/-- An a.e. simple minorant can be replaced by an a.e. equal pointwise simple minorant. -/
+@[to_dual exists_ge_of_ae_ge
+/-- An a.e. simple majorant can be replaced by an a.e. equal pointwise simple majorant. -/]
+theorem exists_le_of_ae_le [LE β] [OrderBot β] {μ : Measure α}
+    (f : α →ₛ β) {g : α → β} (h : f ≤ᵐ[μ] g) :
+    ∃ f' : α →ₛ β, ⇑f' ≤ g ∧ f =ᵐ[μ] f' := by
+  classical
+  obtain ⟨s, hs, hsm, hle⟩ := h.exists_measurable_mem
+  refine ⟨piecewise s hsm f (const α ⊥), ?_, ?_⟩
+  · intro x
+    by_cases hx : x ∈ s <;> simp [piecewise_apply, hx, hle]
+  · exact Filter.Eventually.mono hs fun x hx ↦ (Set.piecewise_eq_of_mem s _ _ hx).symm
+
 /-- Dependent If-then-else as a `SimpleFunc`. -/
 @[simps]
 def dite (s : Set α) (hs : MeasurableSet s) (f : s →ₛ β) (g : (sᶜ : Set α) →ₛ β) : α →ₛ β where
