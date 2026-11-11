@@ -5792,6 +5792,7 @@ public import Mathlib.MeasureTheory.Integral.SetToL1.Function
 public import Mathlib.MeasureTheory.Integral.SetToL1.L1
 public import Mathlib.MeasureTheory.Integral.SetToL1.SimpleFunc
 public import Mathlib.MeasureTheory.Integral.TorusIntegral
+public import Mathlib.MeasureTheory.Integral.Upper
 public import Mathlib.MeasureTheory.MeasurableSpace.Basic
 public import Mathlib.MeasureTheory.MeasurableSpace.Card
 public import Mathlib.MeasureTheory.MeasurableSpace.Constructions
