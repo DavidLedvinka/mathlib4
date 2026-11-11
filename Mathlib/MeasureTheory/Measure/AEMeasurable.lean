@@ -212,28 +212,6 @@ theorem exists_ae_eq_range_subset (H : AEMeasurable f μ) {t : Set β} (ht : ∀
     apply subset_toMeasurable
     simp only [hx, mem_compl_iff, mem_ofPred_eq, false_and, not_false_iff]
 
-theorem exists_measurable_ge [LE β] [OrderTop β]
-    (hg : AEMeasurable g μ) (hfg : f ≤ᵐ[μ] g) :
-    ∃ g' : α → β, Measurable g' ∧ f ≤ g' ∧ g =ᵐ[μ] g' := by
-  classical
-  obtain ⟨s, hs, hsm, hle⟩ := (hfg.congr .rfl hg.ae_eq_mk).exists_measurable_mem
-  refine ⟨s.piecewise (hg.mk g) (fun _ ↦ ⊤),
-    Measurable.piecewise hsm hg.measurable_mk measurable_const,
-    Set.le_piecewise hle (fun _ _ ↦ le_top), ?_⟩
-  exact hg.ae_eq_mk.trans (Filter.Eventually.mono hs fun a ha ↦
-    (Set.piecewise_eq_of_mem s _ _ ha).symm)
-
-theorem exists_measurable_le [LE β] [OrderBot β]
-    (hg : AEMeasurable g μ) (hfg : g ≤ᵐ[μ] f) :
-    ∃ g' : α → β, Measurable g' ∧ g' ≤ f ∧ g =ᵐ[μ] g' := by
-  classical
-  obtain ⟨s, hs, hsm, hle⟩ := (hfg.congr hg.ae_eq_mk .rfl).exists_measurable_mem
-  refine ⟨s.piecewise (hg.mk g) (fun _ ↦ ⊥),
-    Measurable.piecewise hsm hg.measurable_mk measurable_const,
-    Set.piecewise_le hle (fun _ _ ↦ bot_le), ?_⟩
-  exact hg.ae_eq_mk.trans (Filter.Eventually.mono hs fun a ha ↦
-    (Set.piecewise_eq_of_mem s _ _ ha).symm)
-
 theorem exists_measurable_nonneg {β} [Preorder β] [Zero β] {mβ : MeasurableSpace β} {f : α → β}
     (hf : AEMeasurable f μ) (f_nn : ∀ᵐ t ∂μ, 0 ≤ f t) : ∃ g, Measurable g ∧ 0 ≤ g ∧ f =ᵐ[μ] g := by
   obtain ⟨G, hG_meas, hG_mem, hG_ae_eq⟩ :=
