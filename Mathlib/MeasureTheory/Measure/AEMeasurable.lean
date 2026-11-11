@@ -212,6 +212,30 @@ theorem exists_ae_eq_range_subset (H : AEMeasurable f μ) {t : Set β} (ht : ∀
     apply subset_toMeasurable
     simp only [hx, mem_compl_iff, mem_ofPred_eq, false_and, not_false_iff]
 
+theorem exists_measurable_ge [LE β] [OrderTop β]
+    (hg : AEMeasurable g μ) (hfg : f ≤ᵐ[μ] g) :
+    ∃ g' : α → β, Measurable g' ∧ f ≤ g' ∧ g =ᵐ[μ] g' := by
+  classical
+  obtain ⟨g₀, hg₀, hgg₀⟩ := hg
+  obtain ⟨s, hs_ae, hs_meas, hs_bound⟩ := (hfg.congr .rfl hgg₀).exists_measurable_mem
+  refine ⟨s.piecewise g₀ (fun _ ↦ ⊤), ?_, ?_, ?_⟩
+  · exact Measurable.piecewise hs_meas hg₀ measurable_const
+  · exact le_piecewise hs_bound (fun _ _ ↦ le_top)
+  · grw [hgg₀, (piecewise_eqOn s g₀ _).eventuallyEq_of_mem hs_ae]
+
+theorem exists_measurable_le [LE β] [OrderBot β]
+    (hg : AEMeasurable g μ) (hfg : g ≤ᵐ[μ] f) :
+    ∃ g' : α → β, Measurable g' ∧ g' ≤ f ∧ g =ᵐ[μ] g' := by
+  classical
+  obtain ⟨g₀, hg₀, hgg₀⟩ := hg
+  have hg₀f : g₀ ≤ᵐ[μ] f := hfg.congr hgg₀ .rfl
+  obtain ⟨s, hs_ae, hs_meas, hs_bound⟩ := hg₀f.exists_measurable_mem
+  -- Use `⊥` outside this measurable set of full measure to make the bound hold everywhere.
+  refine ⟨s.piecewise g₀ (fun _ ↦ ⊥), ?_, ?_, ?_⟩
+  · exact Measurable.piecewise hs_meas hg₀ measurable_const
+  · exact piecewise_le hs_bound (fun _ _ ↦ bot_le)
+  · grw [hgg₀, (piecewise_eqOn s g₀ _).eventuallyEq_of_mem hs_ae]
+
 theorem exists_measurable_nonneg {β} [Preorder β] [Zero β] {mβ : MeasurableSpace β} {f : α → β}
     (hf : AEMeasurable f μ) (f_nn : ∀ᵐ t ∂μ, 0 ≤ f t) : ∃ g, Measurable g ∧ 0 ≤ g ∧ f =ᵐ[μ] g := by
   obtain ⟨G, hG_meas, hG_mem, hG_ae_eq⟩ :=

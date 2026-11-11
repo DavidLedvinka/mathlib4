@@ -272,6 +272,24 @@ lemma measure_support_eapprox_lt_top {f : α → ℝ≥0∞} (hf_meas : Measurab
   measure_support_lt_top_of_lintegral_ne_top
     ((lintegral_eapprox_le_lintegral hf_meas n).trans_lt hf.lt_top).ne
 
+theorem exists_measurable_superset_setLIntegral_eq {f : α → ℝ≥0∞} (hf : AEMeasurable f μ)
+    (s : Set α) :
+    ∃ t, s ⊆ t ∧ MeasurableSet t ∧ ∫⁻ a in t, f a ∂μ = ∫⁻ a in s, f a ∂μ := by
+  obtain ⟨g, hg, hfg⟩ := hf
+  let ν (p : Σ n, (eapprox g n).range) : Measure α :=
+    μ.restrict ((eapprox g p.1) ⁻¹' {p.2.val})
+  obtain ⟨t, hst, ht, hν⟩ := exists_measurable_superset_forall_eq ν s
+  refine ⟨t, hst, ht, ?_⟩
+  simp_rw [lintegral_congr_ae hfg.restrict,
+    lintegral_eq_iSup_eapprox_lintegral hg, SimpleFunc.lintegral]
+  congr 1
+  funext n
+  apply Finset.sum_congr rfl
+  intro c hc
+  congr 1
+  simpa [ν, Measure.restrict_apply ((eapprox g n).measurableSet_fiber c),
+    Measure.restrict_apply' ((eapprox g n).measurableSet_fiber c), inter_comm] using hν ⟨n, ⟨c, hc⟩⟩
+
 /-- The sum of the lower Lebesgue integrals of two functions is less than or equal to the integral
 of their sum. The other inequality needs one of these functions to be (a.e.-)measurable. -/
 theorem le_lintegral_add (f g : α → ℝ≥0∞) :

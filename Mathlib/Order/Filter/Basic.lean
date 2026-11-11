@@ -1227,6 +1227,11 @@ theorem EventuallyLE.rfl : f ≤ᶠ[l] f :=
 theorem EventuallyLE.trans (H₁ : f ≤ᶠ[l] g) (H₂ : g ≤ᶠ[l] h) : f ≤ᶠ[l] h :=
   H₂.mp <| H₁.mono fun _ => le_trans
 
+@[gcongr]
+lemma eventuallyLE_mono {f₁ f₂ g₁ g₂ : α → β} (hf : f₂ ≤ f₁) (hg : g₁ ≤ g₂) :
+    f₁ ≤ᶠ[l] g₁ → f₂ ≤ᶠ[l] g₂ :=
+  fun h ↦ h.mono fun x hx ↦ (hf x).trans (hx.trans (hg x))
+
 instance : Trans ((· ≤ᶠ[l] ·) : (α → β) → (α → β) → Prop) (· ≤ᶠ[l] ·) (· ≤ᶠ[l] ·) where
   trans := EventuallyLE.trans
 
