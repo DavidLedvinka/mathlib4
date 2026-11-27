@@ -41,7 +41,7 @@ lemma comp_eq_sum_of_countable [Countable α] [MeasurableSingletonClass α] :
     κ ∘ₘ μ = Measure.sum (fun ω ↦ μ {ω} • κ ω) := by
   ext s hs
   rw [Measure.sum_apply _ hs, Measure.bind_apply hs (by fun_prop)]
-  simp [lintegral_countable', mul_comm]
+  simp [lintegral_eq_tsum, mul_comm]
 
 @[simp]
 lemma snd_compProd (μ : Measure α) [SFinite μ] (κ : Kernel α β) [IsSFiniteKernel κ] :

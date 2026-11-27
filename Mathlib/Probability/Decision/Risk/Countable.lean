@@ -31,7 +31,7 @@ variable {Θ 𝓧 𝓨 : Type*}
 
 lemma avgRisk_countable [Countable Θ] [MeasurableSingletonClass Θ] :
     avgRisk ℓ P κ π = ∑' θ, (∫⁻ y, ℓ θ y ∂((κ ∘ₖ P) θ)) * π {θ} := by
-  simp [avgRisk, lintegral_countable']
+  simp [avgRisk, lintegral_eq_tsum]
 
 lemma avgRisk_fintype [Fintype Θ] [MeasurableSingletonClass Θ] :
     avgRisk ℓ P κ π = ∑ θ, (∫⁻ y, ℓ θ y ∂((κ ∘ₖ P) θ)) * π {θ} := by
@@ -39,7 +39,7 @@ lemma avgRisk_fintype [Fintype Θ] [MeasurableSingletonClass Θ] :
 
 lemma avgRisk_countable' [Countable 𝓨] [MeasurableSingletonClass 𝓨] (hℓ : Measurable ℓ) :
     avgRisk ℓ P κ π = ∑' y, ∫⁻ θ, ℓ θ y * (κ ∘ₘ P θ) {y} ∂π := by
-  simp only [avgRisk, lintegral_countable']
+  simp only [avgRisk, lintegral_eq_tsum]
   rw [lintegral_tsum]
   · rfl
   · refine fun y ↦ Measurable.aemeasurable ?_

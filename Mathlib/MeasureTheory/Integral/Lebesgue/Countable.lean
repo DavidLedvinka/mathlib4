@@ -11,11 +11,12 @@ public import Mathlib.MeasureTheory.Measure.Count
 public import Mathlib.MeasureTheory.Measure.Discrete.Basic
 
 /-!
-# Lebesgue integral over finite and countable types, sets and measures
+# Lebesgue integral for discrete and finite measures and over countable sets
 
 The lemmas in this file require at least one of the following of the Lebesgue integral:
 * The type of the set of integration is finite or countable
 * The set of integration is finite or countable
+* The measure is discrete
 * The measure is finite, s-finite or sigma-finite
 -/
 
@@ -119,12 +120,15 @@ end DiracAndCount
 
 section Countable
 
-theorem lintegral_countable' [Countable α] [MeasurableSingletonClass α] (f : α → ℝ≥0∞) :
+/-- The Lebesgue integral with respect to a discrete measure is the sum weighted by its
+singleton masses. -/
+theorem lintegral_eq_tsum [IsDiscreteMeasure μ] [MeasurableSingletonClass α] (f : α → ℝ≥0∞) :
     ∫⁻ a, f a ∂μ = ∑' a, f a * μ {a} := by
   conv_lhs =>
     rw [IsDiscreteMeasure.eq_discreteMeasure μ, discreteMeasure_def, lintegral_sum_measure]
-  congr 1 with a : 1
   simp [mul_comm]
+
+@[deprecated (since := "2026-11-27")] alias lintegral_countable' := lintegral_eq_tsum
 
 theorem lintegral_singleton' {f : α → ℝ≥0∞} (hf : Measurable f) (a : α) :
     ∫⁻ x in {a}, f x ∂μ = f a * μ {a} := by
@@ -242,7 +246,7 @@ theorem exists_pos_lintegral_lt_of_sigmaFinite (μ : Measure α) [SigmaFinite μ
   refine ⟨δ ∘ N, fun x => δpos _, measurable_from_nat.comp hN_meas, ?_⟩
   simp_rw [Function.comp_apply, ← Function.comp_apply (f := (fun n ↦ (↑(δ n) : ℝ≥0∞))),
     lintegral_comp measurable_from_nat.coe_nnreal_ennreal hN_meas]
-  simpa [N, hNs, lintegral_countable', measurableSet_spanningSetsIndex, mul_comm] using δsum
+  simpa [N, hNs, lintegral_eq_tsum, measurableSet_spanningSetsIndex, mul_comm] using δsum
 
 omit [MeasurableSpace α]
 

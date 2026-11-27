@@ -25,7 +25,7 @@ In this file we prove that a function `f` is integrable with respect to a counta
 We specialize these results to the case where each measure is a Dirac mass,
 i.e. `μ i = (c i) • .dirac (x i)`.
 
-Finally we compute integrals over countable and finite spaces or sets.
+Finally we compute integrals with respect to discrete measures and over countable and finite sets.
 
 ## Main statements
 
@@ -176,16 +176,20 @@ lemma integral_sum_dirac_eq_tsum [CompleteSpace E] (hc : ∀ i, c i ≠ ∞)
 
 end Dirac
 
-section DiscreteSpace
+section DiscreteMeasure
 
 variable [CompleteSpace E] [MeasurableSingletonClass X] {μ : Measure X}
 
-theorem integral_countable [Countable X] (hf : Integrable f μ) :
+/-- The integral of an integrable function with respect to a discrete measure is the sum weighted
+by its singleton masses. -/
+theorem integral_eq_tsum [IsDiscreteMeasure μ] (hf : Integrable f μ) :
     ∫ x, f x ∂μ = ∑' x, μ.real {x} • f x := by
   rw [IsDiscreteMeasure.eq_discreteMeasure μ, discreteMeasure_def] at hf
   conv_lhs =>
     rw [IsDiscreteMeasure.eq_discreteMeasure μ, discreteMeasure_def, integral_sum_measure hf]
   simp [integral_smul_measure, integral_dirac, measureReal_def]
+
+@[deprecated (since := "2026-11-27")] alias integral_countable := integral_eq_tsum
 
 theorem setIntegral_countable (f : X → E) {s : Set X} (hs : s.Countable) (hf : IntegrableOn f s μ) :
     ∫ x in s, f x ∂μ = ∑' x : s, μ.real {(x : X)} • f x := by
@@ -196,7 +200,7 @@ theorem setIntegral_countable (f : X → E) {s : Set X} (hs : s.Countable) (hf :
     · exact Integrable.aestronglyMeasurable hf
     · exact Measurable.aemeasurable measurable_subtypeVal
     · exact Countable.measurableSet hs
-  rw [← integral_subtype_comap hs.measurableSet, integral_countable hf']
+  rw [← integral_subtype_comap hs.measurableSet, integral_eq_tsum hf']
   congr 1 with a : 1
   rw [measureReal_def, Measure.comap_apply Subtype.val Subtype.coe_injective
     (fun s' hs' ↦ MeasurableSet.subtype_image (Countable.measurableSet hs) hs') _
@@ -216,7 +220,7 @@ theorem integral_fintype [Fintype X] (hf : Integrable f μ) :
 @[simp] lemma integral_count [Fintype X] (f : X → E) :
     ∫ x, f x ∂.count = ∑ a, f a := by simp [integral_fintype]
 
-end DiscreteSpace
+end DiscreteMeasure
 
 end Integral
 
