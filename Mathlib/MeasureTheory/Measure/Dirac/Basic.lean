@@ -6,11 +6,9 @@ Authors: Johannes Hölzl
 module
 
 public import Mathlib.MeasureTheory.MeasurableSpace.CountablyGenerated
-public import Mathlib.MeasureTheory.Measure.Dirac.Restrict
 public import Mathlib.MeasureTheory.Measure.MutuallySingular
 public import Mathlib.MeasureTheory.Measure.Typeclasses.NullSingletonClass
 public import Mathlib.MeasureTheory.Measure.Typeclasses.Probability
-public import Mathlib.MeasureTheory.Measure.Typeclasses.SFinite
 
 set_option doc.verso true
 set_option doc.verso.suggestions false
@@ -50,9 +48,33 @@ lemma map_const (μ : Measure α) (c : β) : μ.map (fun _ ↦ c) = (μ Set.univ
   · rw [(Set.indicator_eq_one_iff_mem _).mpr hsc, mul_one, ite_eq_left hsc]
   · rw [ite_eq_right hsc, (Set.indicator_eq_zero_iff_notMem _).mpr hsc, measure_empty, mul_zero]
 
+@[simp]
+theorem restrict_singleton (μ : Measure α) (a : α) : μ.restrict {a} = μ {a} • dirac a := by
+  ext1 s hs
+  by_cases ha : a ∈ s
+  · have : s ∩ {a} = {a} := by simpa
+    simp [*]
+  · have : s ∩ {a} = ∅ := inter_singleton_eq_empty.2 ha
+    simp [*]
+
+/-- Restricting a Dirac measure to a set containing its point leaves it unchanged. -/
+theorem restrict_dirac_of_mem (ha : a ∈ s) : (dirac a).restrict s = dirac a := by
+  ext t ht
+  by_cases hat : a ∈ t
+  · simp [restrict_apply ht, hat, ha]
+  · rw [dirac_apply' _ ht, indicator_of_notMem hat, restrict_apply ht]
+    exact measure_mono_null inter_subset_left (by simp [dirac_apply' _ ht, hat])
+
 end Measure
 
 open Measure
+
+/-- A scaled Dirac measure is bounded by a measure exactly when its weight is bounded
+by the mass of its singleton. -/
+lemma smul_dirac_le_iff {c : ℝ≥0∞} {μ : Measure α} : c • dirac a ≤ μ ↔ c ≤ μ {a} := by
+  refine ⟨fun h ↦ by simpa using h {a}, fun h ↦ ?_⟩
+  grw [h, ← restrict_singleton]
+  exact restrict_le_self
 
 theorem mem_ae_dirac_iff {a : α} (hs : MeasurableSet s) : s ∈ ae (dirac a) ↔ a ∈ s := by
   by_cases a ∈ s <;> simp [mem_ae_iff, dirac_apply', hs.compl, *]
@@ -110,7 +132,6 @@ instance [hα : Nonempty α] : Nonempty {μ : Measure α // IsProbabilityMeasure
 /-! Extra instances to short-circuit type class resolution -/
 
 instance Measure.dirac.instIsFiniteMeasure {a : α} : IsFiniteMeasure (dirac a) := inferInstance
-instance Measure.dirac.instSigmaFinite {a : α} : SigmaFinite (dirac a) := inferInstance
 
 theorem dirac_eq_one_iff_mem (hs : MeasurableSet s) : dirac a s = 1 ↔ a ∈ s := by
   rw [← prob_compl_eq_zero_iff hs, ← mem_ae_iff]

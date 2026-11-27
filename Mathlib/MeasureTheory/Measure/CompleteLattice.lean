@@ -201,6 +201,19 @@ lemma inf_apply {s : Set α} (hs : MeasurableSet s) :
       rw [mem_ofPred_eq] at hk₁ hk₂
       exact False.elim <| hk₂.not_ge hk₁
 
+/-- Taking the infimum of measures takes the infimum of their singleton masses. -/
+lemma inf_apply_singleton (μ ν : Measure α) (a : α) : (μ ⊓ ν) {a} = μ {a} ⊓ ν {a} := by
+  apply le_antisymm (le_inf (measure_mono_left inf_le_left _) (measure_mono_left inf_le_right _))
+  rw [← measure_toMeasurable (μ := μ ⊓ ν) {a}, inf_apply (measurableSet_toMeasurable _ _)]
+  refine le_sInf ?_
+  rintro c ⟨s, rfl⟩
+  have ha := subset_toMeasurable (μ ⊓ ν) {a} (mem_singleton a)
+  by_cases has : a ∈ s
+  · apply le_add_of_le_left (inf_le_left.trans _)
+    exact measure_mono (singleton_subset_iff.mpr ⟨has, ha⟩)
+  · apply le_add_of_le_right (inf_le_right.trans _)
+    exact measure_mono (singleton_subset_iff.mpr ⟨has, ha⟩)
+
 @[simp]
 theorem _root_.MeasureTheory.OuterMeasure.toMeasure_top :
     (⊤ : OuterMeasure α).toMeasure (by rw [OuterMeasure.top_caratheodory]; exact le_top) =

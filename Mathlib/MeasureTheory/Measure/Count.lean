@@ -6,6 +6,7 @@ Authors: Johannes Hölzl
 module
 
 public import Mathlib.MeasureTheory.Measure.Dirac.Basic
+public import Mathlib.MeasureTheory.Measure.Typeclasses.SFinite
 
 import Mathlib.SetTheory.Cardinal.ENNReal
 

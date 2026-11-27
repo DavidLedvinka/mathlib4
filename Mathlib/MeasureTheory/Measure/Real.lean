@@ -5,6 +5,7 @@ Authors: Sébastien Gouëzel
 -/
 module
 
+public import Mathlib.MeasureTheory.Measure.Discrete.Basic
 public import Mathlib.MeasureTheory.Measure.Typeclasses.Probability
 public import Mathlib.MeasureTheory.Measure.Typeclasses.SFinite
 
@@ -96,6 +97,19 @@ theorem measureReal_eq_measureReal_iff {m : MeasurableSpace β} {ν : Measure β
     (h₁ : μ s ≠ ∞ := by finiteness) (h₂ : ν t ≠ ∞ := by finiteness) :
     μ.real s = ν.real t ↔ μ s = ν t := by
   simp [measureReal_def, ENNReal.toReal_eq_toReal_iff' h₁ h₂]
+
+/-- Two sigma-finite discrete measures are equal if and only if their real-valued singleton
+masses agree. -/
+theorem ext_iff_measureReal_singleton
+    {μ1 μ2 : Measure α} [IsDiscreteMeasure μ1] [IsDiscreteMeasure μ2]
+    [SigmaFinite μ1] [SigmaFinite μ2] :
+    μ1 = μ2 ↔ ∀ x, μ1.real {x} = μ2.real {x} := by
+  rw [Measure.ext_iff_singleton]
+  congr! with x
+  rw [measureReal_def, measureReal_def, ENNReal.toReal_eq_toReal_iff]
+  simp [measure_singleton_lt_top, ne_of_lt]
+
+alias ⟨_, Measure.ext_of_measureReal_singleton⟩ := MeasureTheory.ext_iff_measureReal_singleton
 
 theorem measureReal_restrict_apply₀ (ht : NullMeasurableSet t (μ.restrict s)) :
     (μ.restrict s).real t = μ.real (t ∩ s) := by

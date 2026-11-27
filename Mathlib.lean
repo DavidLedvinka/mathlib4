@@ -5854,11 +5854,9 @@ public import Mathlib.MeasureTheory.Measure.Decomposition.RadonNikodym
 public import Mathlib.MeasureTheory.Measure.Dirac
 public import Mathlib.MeasureTheory.Measure.Dirac.Basic
 public import Mathlib.MeasureTheory.Measure.Dirac.Def
-public import Mathlib.MeasureTheory.Measure.Dirac.Restrict
 public import Mathlib.MeasureTheory.Measure.DiracProba
 public import Mathlib.MeasureTheory.Measure.Discrete.Basic
 public import Mathlib.MeasureTheory.Measure.Discrete.Def
-public import Mathlib.MeasureTheory.Measure.Discrete.Real
 public import Mathlib.MeasureTheory.Measure.Doubling
 public import Mathlib.MeasureTheory.Measure.EverywherePos
 public import Mathlib.MeasureTheory.Measure.Filter

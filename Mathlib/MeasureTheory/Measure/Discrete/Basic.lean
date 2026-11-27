@@ -5,7 +5,7 @@ Authors: Johannes Hölzl, David Ledvinka
 -/
 module
 
-public import Mathlib.MeasureTheory.Measure.Dirac.Restrict
+public import Mathlib.MeasureTheory.Measure.Dirac.Basic
 public import Mathlib.MeasureTheory.Measure.Discrete.Def
 
 /-!
