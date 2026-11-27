@@ -22,8 +22,8 @@ In this file we prove that a function `f` is integrable with respect to a counta
 `fun i ↦ ∫ x, ‖f x‖ ∂μ i` is summable. We then show that under this integrability condition,
 `∫ x, f x ∂Measure.sum μ = ∑' i, ∫ f x ∂μ i`.
 
-We specialize these results to the case where each measure is a Dirac mass,
-i.e. `μ i = (c i) • .dirac (x i)`.
+We specialize these results to indexed discrete measures `discreteMeasure c x`.
+The integral formulas sum over the original indices, including repeated atoms.
 
 Finally we compute integrals with respect to discrete measures and over countable and finite sets.
 
@@ -32,13 +32,14 @@ Finally we compute integrals with respect to discrete measures and over countabl
 * `integrable_sum_measure_iff`: A function `f` is integrable with respect to a countable sum
   of measures `Measure.sum μ` if and only if `f` is integrable with respect to each `μ i` and the
   sequence `fun i ↦ ∫ x, ‖f x‖ ∂μ i` is summable.
-* `integrable_sum_dirac_iff`: A function `f` is integrable with respect to a countable sum
-  of Dirac masses `Measure.sum (fun i ↦ (c i) • Measure.dirac (x i))` if and only if
-  the sequence `fun i ↦ (c i).toReal * ‖f (x i)‖` is summable.
+* `integrable_discreteMeasure_iff`: For countably many finite weights, a function `f` is integrable
+  with respect to `discreteMeasure c x` if and only if
+  the family `fun i ↦ (c i).toReal * ‖f (x i)‖` is summable.
 * `hasSum_integral_measure`: If `f` is integrable with respect to `Measure.sum μ`,
   then the sequence `fun i ↦ ∫ x, f x ∂μ i` is summable and its sum is `∫ x, f x ∂Measure.sum μ`.
-* `integral_sum_dirac_eq_tsum`: If the sequence `fun i ↦ (c i).toReal * ‖f (x i)‖` is summable,
-  then `∑' i, (c i).toReal • f (x i) = ∫ x, f x, ∂Measure.sum (fun i ↦ (c i) • .dirac (x i))`.
+* `hasSum_integral_discreteMeasure`: If `f` is integrable with respect to `discreteMeasure c x`,
+  then `fun i ↦ (c i).toReal • f (x i)` sums to its integral, with no countability assumption.
+* `integral_discreteMeasure`: The corresponding formula for the integral as a `tsum`.
 
 ## Tags
 
@@ -86,31 +87,50 @@ lemma integrable_sum_measure_iff :
   mp h := ⟨fun i ↦ h.mono_measure (Measure.le_sum _ i), h.summable_integral⟩
   mpr h := integrable_sum_measure h.1 h.2
 
-section Dirac
+section DiscreteMeasure
 
 variable [MeasurableSingletonClass X] {x : ι → X} {c : ι → ℝ≥0∞}
 
-lemma integrable_sum_dirac (hc : ∀ i, c i ≠ ∞) (h : Summable (fun i ↦ (c i).toReal * ‖f (x i)‖)) :
-    Integrable f (Measure.sum (fun i ↦ (c i) • .dirac (x i))) :=
-  integrable_sum_measure (fun i ↦ (integrable_dirac (by simp)).smul_measure (hc i))
+lemma integrable_discreteMeasure (hc : ∀ i, c i ≠ ∞)
+    (h : Summable (fun i ↦ (c i).toReal * ‖f (x i)‖)) :
+    Integrable f (discreteMeasure c x) := by
+  rw [discreteMeasure_def]
+  exact integrable_sum_measure (fun i ↦ (integrable_dirac (by simp)).smul_measure (hc i))
     (by simpa using h)
 
 omit [Countable ι] in
-lemma Integrable.summable_of_dirac
-    (hf : Integrable f (Measure.sum (fun i ↦ (c i) • .dirac (x i)))) :
+lemma Integrable.summable_discreteMeasure (hf : Integrable f (discreteMeasure c x)) :
     Summable (fun i ↦ (c i).toReal * ‖f (x i)‖) := by
+  rw [discreteMeasure_def] at hf
   simpa using hf.summable_integral
 
-/-- A function `f` is integrable with respect to a countable sum of
-Dirac masses `Measure.sum (fun i ↦ (c i) • Measure.dirac (x i))` if and only if
-the sequence `fun i ↦ (c i).toReal * ‖f (x i)‖` is summable. -/
+/-- For countably many finite weights, integrability with respect to `discreteMeasure c x`
+is equivalent to summability of the weighted norms. -/
+lemma integrable_discreteMeasure_iff (hc : ∀ i, c i ≠ ∞) :
+    Integrable f (discreteMeasure c x) ↔
+      Summable (fun i ↦ (c i).toReal * ‖f (x i)‖) where
+  mp h := h.summable_discreteMeasure
+  mpr h := integrable_discreteMeasure hc h
+
+@[deprecated integrable_discreteMeasure +typeChanged (since := "2026-11-27")]
+lemma integrable_sum_dirac (hc : ∀ i, c i ≠ ∞) (h : Summable (fun i ↦ (c i).toReal * ‖f (x i)‖)) :
+    Integrable f (Measure.sum (fun i ↦ (c i) • .dirac (x i))) :=
+  integrable_discreteMeasure hc h
+
+omit [Countable ι] in
+@[deprecated Integrable.summable_discreteMeasure +typeChanged (since := "2026-11-27")]
+lemma Integrable.summable_of_dirac
+    (hf : Integrable f (Measure.sum (fun i ↦ (c i) • .dirac (x i)))) :
+    Summable (fun i ↦ (c i).toReal * ‖f (x i)‖) :=
+  hf.summable_discreteMeasure
+
+@[deprecated integrable_discreteMeasure_iff +typeChanged (since := "2026-11-27")]
 lemma integrable_sum_dirac_iff (hc : ∀ i, c i ≠ ∞) :
     Integrable f (Measure.sum (fun i ↦ (c i) • .dirac (x i))) ↔
-      Summable (fun i ↦ (c i).toReal * ‖f (x i)‖) where
-  mp h := h.summable_of_dirac
-  mpr h := integrable_sum_dirac hc h
+      Summable (fun i ↦ (c i).toReal * ‖f (x i)‖) :=
+  integrable_discreteMeasure_iff hc
 
-end Dirac
+end DiscreteMeasure
 
 end Integrable
 
@@ -146,48 +166,64 @@ theorem integral_sum_measure (hf : Integrable f (Measure.sum μ)) :
     ∫ x, f x ∂Measure.sum μ = ∑' i, ∫ x, f x ∂μ i :=
   (hasSum_integral_measure hf).tsum_eq.symm
 
-section Dirac
+section DiscreteMeasure
 
 variable [MeasurableSingletonClass X] {x : ι → X} {c : ι → ℝ≥0∞}
 
-lemma integral_sum_dirac [FiniteDimensional ℝ E] (hc : ∀ i, c i ≠ ∞) :
-    ∫ x, f x ∂Measure.sum (fun i ↦ (c i) • .dirac (x i)) = ∑' i, (c i).toReal • f (x i) := by
-  by_cases hf : Integrable f (.sum (fun i ↦ (c i) • .dirac (x i)))
-  · rw [integral_sum_measure hf]
-    congr with i
-    rw [integral_smul_measure, integral_dirac]
+omit [Countable ι] in
+/-- The weighted values of an integrable function sum to its integral against a discrete measure.
+The index type need not be countable, and coefficients may be infinite. -/
+lemma hasSum_integral_discreteMeasure [CompleteSpace E]
+    (hf : Integrable f (discreteMeasure c x)) :
+    HasSum (fun i ↦ (c i).toReal • f (x i)) (∫ a, f a ∂discreteMeasure c x) := by
+  rw [discreteMeasure_def] at hf ⊢
+  simpa using hasSum_integral_measure hf
+
+omit [Countable ι] in
+/-- The integral against an indexed discrete measure is the sum of the weighted values. -/
+lemma integral_discreteMeasure [CompleteSpace E] (hf : Integrable f (discreteMeasure c x)) :
+    ∫ a, f a ∂discreteMeasure c x = ∑' i, (c i).toReal • f (x i) :=
+  (hasSum_integral_discreteMeasure hf).tsum_eq.symm
+
+/-- For countably many finite weights and a finite-dimensional codomain, the integral formula
+also holds without an integrability hypothesis: both sides are zero when the sum diverges. -/
+lemma integral_discreteMeasure_of_finiteDimensional [FiniteDimensional ℝ E] (hc : ∀ i, c i ≠ ∞) :
+    ∫ a, f a ∂discreteMeasure c x = ∑' i, (c i).toReal • f (x i) := by
+  by_cases hf : Integrable f (discreteMeasure c x)
+  · exact integral_discreteMeasure hf
   · rw [integral_undef hf, tsum_eq_zero_of_not_summable]
     apply mt Summable.norm
-    convert! mt (integrable_sum_dirac hc) hf
+    convert! mt (integrable_discreteMeasure hc) hf
     simp [norm_smul]
 
+@[deprecated integral_discreteMeasure_of_finiteDimensional +typeChanged (since := "2026-11-27")]
+lemma integral_sum_dirac [FiniteDimensional ℝ E] (hc : ∀ i, c i ≠ ∞) :
+    ∫ a, f a ∂Measure.sum (fun i ↦ (c i) • .dirac (x i)) = ∑' i, (c i).toReal • f (x i) :=
+  integral_discreteMeasure_of_finiteDimensional hc
+
+@[deprecated hasSum_integral_discreteMeasure +typeChanged (since := "2026-11-27")]
 lemma hasSum_integral_sum_dirac [CompleteSpace E] (hc : ∀ i, c i ≠ ∞)
     (hf : Summable (fun i ↦ (c i).toReal * ‖f (x i)‖)) :
     HasSum (fun i ↦ (c i).toReal • f (x i))
-      (∫ x, f x ∂Measure.sum (fun i ↦ (c i) • .dirac (x i))) := by
-  simpa using hasSum_integral_measure (integrable_sum_dirac hc hf)
+      (∫ a, f a ∂Measure.sum (fun i ↦ (c i) • .dirac (x i))) :=
+  hasSum_integral_discreteMeasure (integrable_discreteMeasure hc hf)
 
-/-- If the sequence `fun i ↦ (c i).toReal * ‖f (x i)‖` is summable, then
-`∫ x, f x, ∂Measure.sum (fun i ↦ (c i) • .dirac (x i)) = ∑' i, (c i).toReal • f (x i)`. -/
+@[deprecated integral_discreteMeasure +typeChanged (since := "2026-11-27")]
 lemma integral_sum_dirac_eq_tsum [CompleteSpace E] (hc : ∀ i, c i ≠ ∞)
     (hf : Summable (fun i ↦ (c i).toReal * ‖f (x i)‖)) :
-    ∫ x, f x ∂Measure.sum (fun i ↦ (c i) • .dirac (x i)) = ∑' i, (c i).toReal • f (x i) :=
-  (hasSum_integral_sum_dirac hc hf).tsum_eq.symm
+    ∫ a, f a ∂Measure.sum (fun i ↦ (c i) • .dirac (x i)) = ∑' i, (c i).toReal • f (x i) :=
+  integral_discreteMeasure (integrable_discreteMeasure hc hf)
 
-end Dirac
-
-section DiscreteMeasure
-
-variable [CompleteSpace E] [MeasurableSingletonClass X] {μ : Measure X}
+variable [CompleteSpace E] {μ : Measure X}
 
 /-- The integral of an integrable function with respect to a discrete measure is the sum weighted
 by its singleton masses. -/
 theorem integral_eq_tsum [IsDiscreteMeasure μ] (hf : Integrable f μ) :
     ∫ x, f x ∂μ = ∑' x, μ.real {x} • f x := by
-  rw [IsDiscreteMeasure.eq_discreteMeasure μ, discreteMeasure_def] at hf
+  rw [IsDiscreteMeasure.eq_discreteMeasure μ] at hf
   conv_lhs =>
-    rw [IsDiscreteMeasure.eq_discreteMeasure μ, discreteMeasure_def, integral_sum_measure hf]
-  simp [integral_smul_measure, integral_dirac, measureReal_def]
+    rw [IsDiscreteMeasure.eq_discreteMeasure μ, integral_discreteMeasure hf]
+  rfl
 
 @[deprecated (since := "2026-11-27")] alias integral_countable := integral_eq_tsum
 

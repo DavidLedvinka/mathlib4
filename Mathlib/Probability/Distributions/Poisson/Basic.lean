@@ -38,7 +38,7 @@ namespace ProbabilityTheory
 @[wikidata Q205692]
 noncomputable
 def poissonMeasure (r : ℝ≥0) : Measure ℕ :=
-  Measure.sum (fun n ↦ ENNReal.ofReal (exp (-r) * r ^ n / (n)!) • (.dirac n))
+  discreteMeasure (fun n ↦ ENNReal.ofReal (exp (-r) * r ^ n / (n)!)) id
 
 /-- The Poisson probability distribution with rate `r`. -/
 scoped notation3 "Po(" r ")" => poissonMeasure r
@@ -74,26 +74,22 @@ variable {R : Type*} [NatCast R] [MeasurableSpace R]
 
 lemma integrable_poissonMeasure_iff {r : ℝ≥0} {f : ℕ → E} :
     Integrable f Po(r) ↔ Summable (fun n ↦ exp (-r) * r ^ n / (n)! * ‖f n‖) := by
-  rw [poissonMeasure, integrable_sum_dirac_iff (by simp)]
-  congrm Summable (fun n ↦ ?_ * _)
-  rw [ENNReal.toReal_ofReal (by positivity)]
+  rw [poissonMeasure, integrable_discreteMeasure_iff (by simp)]
+  simp (disch := positivity) [ENNReal.toReal_ofReal]
 
-lemma integrable_map_cast_poissonMeasure_iff {r : ℝ≥0} [Countable R] [MeasurableSingletonClass R]
-  {f : R → E} : Integrable f Po(R, r) ↔ Integrable (f ∘ Nat.cast) Po(r) :=
-  integrable_map_measure .of_discrete .of_discrete
+lemma integrable_map_cast_poissonMeasure_iff {r : ℝ≥0} [MeasurableSingletonClass R]
+    {f : R → E} : Integrable f Po(R, r) ↔ Integrable (f ∘ Nat.cast) Po(r) := by
+  simp only [poissonMeasure, map_discreteMeasure₀ .of_discrete]
+  rw [integrable_discreteMeasure_iff (by simp), integrable_discreteMeasure_iff (by simp)]
+  rfl
 
 variable [NormedSpace ℝ E]
 
 lemma hasSum_integral_poissonMeasure [CompleteSpace E] {r : ℝ≥0} {f : ℕ → E}
     (hf : Integrable f Po(r)) :
     HasSum (fun n ↦ (exp (-r) * r ^ n / (n)!) • f n) (∫ n, f n ∂Po(r)) := by
-  have : (fun n ↦ (exp (-r) * r ^ n / (n)!) • f n) =
-      fun n ↦ (ENNReal.ofReal (exp (-r) * r ^ n / (n)!)).toReal • f n := by
-    ext; rw [ENNReal.toReal_ofReal (by positivity)]
-  rw [this]
-  apply hasSum_integral_sum_dirac (by simp)
-  convert! integrable_poissonMeasure_iff.1 hf
-  rw [ENNReal.toReal_ofReal (by positivity)]
+  simpa (disch := positivity) [poissonMeasure, ENNReal.toReal_ofReal] using
+    hasSum_integral_discreteMeasure hf
 
 /-- If a function is integrable with respect to `poissonMeasure r`, then its integral
 against this measure is given by its sum weighted by `exp (-r) * r ^ n / n!`.
@@ -105,12 +101,12 @@ lemma integral_poissonMeasure' [CompleteSpace E] {r : ℝ≥0} {f : ℕ → E}
     ∫ n, f n ∂Po(r) = ∑' n, (exp (-r) * r ^ n / (n)!) • f n :=
   (hasSum_integral_poissonMeasure hf).tsum_eq.symm
 
-lemma integral_map_cast_poissonMeasure' [CompleteSpace E] [Countable R] [MeasurableSingletonClass R]
+lemma integral_map_cast_poissonMeasure' [CompleteSpace E] [MeasurableSingletonClass R]
     {r : ℝ≥0} {f : R → E} (hf : Integrable f Po(R, r)) :
     ∫ x, f x ∂Po(R, r) = ∑' n, (exp (-r) * r ^ n / (n)!) • f n := by
-  rw [integral_map .of_discrete .of_discrete]
-  rw [integrable_map_cast_poissonMeasure_iff] at hf
-  exact integral_poissonMeasure' hf
+  rw [poissonMeasure, map_discreteMeasure₀ .of_discrete] at hf ⊢
+  rw [integral_discreteMeasure hf]
+  simp (disch := positivity) [ENNReal.toReal_ofReal]
 
 /-- The integral of a function taking values in a finite-dimensional space
 against `poissonMeasure r` is given by its sum weighted by `exp (-r) * r ^ n / n!`. This version
@@ -120,14 +116,15 @@ they are both defined to be zero.
 See `integral_poissonMeasure'` with a general codomain which assumes integrability. -/
 lemma integral_poissonMeasure [FiniteDimensional ℝ E] (r : ℝ≥0) (f : ℕ → E) :
     ∫ n, f n ∂Po(r) = ∑' n, (exp (-r) * r ^ n / (n)!) • f n := by
-  rw [poissonMeasure, integral_sum_dirac (by simp)]
-  congr with n
-  rw [ENNReal.toReal_ofReal (by positivity)]
+  rw [poissonMeasure, integral_discreteMeasure_of_finiteDimensional (by simp)]
+  simp (disch := positivity) [ENNReal.toReal_ofReal]
 
-lemma integral_map_cast_poissonMeasure [FiniteDimensional ℝ E] (r : ℝ≥0) [Countable R]
-  [MeasurableSingletonClass R] (f : R → E) :
+lemma integral_map_cast_poissonMeasure [FiniteDimensional ℝ E] (r : ℝ≥0)
+    [MeasurableSingletonClass R] (f : R → E) :
     ∫ x, f x ∂Po(R, r) = ∑' n, (exp (-r) * r ^ n / (n)!) • f n := by
-  rw [integral_map .of_discrete .of_discrete, integral_poissonMeasure]
+  rw [poissonMeasure, map_discreteMeasure₀ .of_discrete,
+    integral_discreteMeasure_of_finiteDimensional (by simp)]
+  simp (disch := positivity) [ENNReal.toReal_ofReal]
 
 end Integral
 
@@ -139,7 +136,7 @@ open Complex
 `t ↦ exp(r(exp(it) - 1))`. -/
 lemma charFun_map_cast_poissonMeasure (r : ℝ≥0) (t : ℝ) :
     charFun Po(ℝ, r) t = cexp (r * (cexp (t * I) - 1)) := by
-  rw [charFun_apply, integral_map .of_discrete (by fun_prop), integral_poissonMeasure r]
+  rw [charFun_apply, integral_map_cast_poissonMeasure r]
   simp_rw [Real.inner_apply]
   calc ∑' a, (rexp (-r) * r ^ a / a ! : ℝ) * cexp ((a * t : ℝ) * I)
   _ = ∑' a, (rexp (-r)) * ((r * cexp (t * I)) ^ a / a !) := by

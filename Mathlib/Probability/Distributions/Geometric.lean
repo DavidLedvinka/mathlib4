@@ -51,13 +51,13 @@ variable {p : unitInterval}
 /-- The geometric measure with success probability `p` as a measure over `ℕ`. -/
 noncomputable def geometricMeasure (p : unitInterval) : Measure ℕ := if p ≠ 0
   then
-    Measure.sum (fun n ↦ ENNReal.ofReal ((1 - p) ^ n * p) • .dirac n)
+    discreteMeasure (fun n ↦ ENNReal.ofReal ((1 - p) ^ n * p)) id
   else
     .dirac 0
 
 lemma geometricMeasure_eq (hp : p ≠ 0) :
     geometricMeasure p =
-      Measure.sum (fun n ↦ ENNReal.ofReal ((1 - p) ^ n * p) • .dirac n) :=
+      discreteMeasure (fun n ↦ ENNReal.ofReal ((1 - p) ^ n * p)) id :=
   ite_eq_left hp
 
 /-- The `positivity` tactic does not work for this goal. Use this lemma to rewrite
@@ -102,22 +102,17 @@ variable {E : Type*} [NormedAddCommGroup E] {f : ℕ → E}
 
 lemma integrable_geometricMeasure_iff (hp : p ≠ 0) :
     Integrable f (geometricMeasure p) ↔ Summable (fun n ↦ (1 - p : ℝ) ^ n * p * ‖f n‖) := by
-  rw [geometricMeasure_eq hp, integrable_sum_dirac_iff (by simp)]
-  congrm Summable (fun n ↦ ?_ * _)
-  rw [ENNReal.toReal_ofReal (geometricMeasure_nonneg p n)]
+  rw [geometricMeasure_eq hp, integrable_discreteMeasure_iff (by simp)]
+  simp [ENNReal.toReal_ofReal (geometricMeasure_nonneg p _)]
 
 variable [NormedSpace ℝ E]
 
 lemma hasSum_integral_geometricMeasure [CompleteSpace E]
     (hp : p ≠ 0) (hf : Integrable f (geometricMeasure p)) :
     HasSum (fun n ↦ ((1 - p : ℝ) ^ n * p) • f n) (∫ n, f n ∂geometricMeasure p) := by
-  have : (fun n ↦ ((1 - p : ℝ) ^ n * p) • f n) =
-      fun n ↦ (ENNReal.ofReal ((1 - p) ^ n * p)).toReal • f n := by
-    ext n; rw [ENNReal.toReal_ofReal (geometricMeasure_nonneg p n)]
-  rw [this, geometricMeasure_eq hp]
-  apply hasSum_integral_sum_dirac (by simp)
-  convert! (integrable_geometricMeasure_iff hp).1 hf with n
-  rw [ENNReal.toReal_ofReal (geometricMeasure_nonneg p n)]
+  rw [geometricMeasure_eq hp] at hf ⊢
+  simpa [ENNReal.toReal_ofReal (geometricMeasure_nonneg p _)] using
+    hasSum_integral_discreteMeasure hf
 
 /-- If a function is integrable with respect to `geometricMeasure p`, then its integral
 against this measure is given by its sum weighted by `(1 - p) ^ n * p`.
@@ -137,9 +132,8 @@ they are both defined to be zero.
 See `integral_geometricMeasure'` with a general codomain which assumes integrability. -/
 lemma integral_geometricMeasure [FiniteDimensional ℝ E] (hp : p ≠ 0) (f : ℕ → E) :
     ∫ n, f n ∂geometricMeasure p = ∑' n : ℕ, ((1 - p : ℝ) ^ n * p) • f n := by
-  rw [geometricMeasure_eq hp, integral_sum_dirac (by simp)]
-  congr with n
-  rw [ENNReal.toReal_ofReal (geometricMeasure_nonneg p n)]
+  rw [geometricMeasure_eq hp, integral_discreteMeasure_of_finiteDimensional (by simp)]
+  simp [ENNReal.toReal_ofReal (geometricMeasure_nonneg p _)]
 
 end Integral
 

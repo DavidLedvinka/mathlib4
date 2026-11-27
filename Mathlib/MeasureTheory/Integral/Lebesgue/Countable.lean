@@ -69,6 +69,13 @@ theorem lintegral_dirac' (a : α) {f : α → ℝ≥0∞} (hf : Measurable f) : 
 theorem lintegral_dirac [MeasurableSingletonClass α] (a : α) (f : α → ℝ≥0∞) :
     ∫⁻ a, f a ∂dirac a = f a := by simp [lintegral_congr_ae (ae_eq_dirac f)]
 
+/-- Integrating against an indexed discrete measure sums over the original indices, including
+repeated atoms. -/
+theorem lintegral_discreteMeasure {ι : Type*} [MeasurableSingletonClass α]
+    (p : ι → ℝ≥0∞) (x : ι → α) (f : α → ℝ≥0∞) :
+    ∫⁻ a, f a ∂discreteMeasure p x = ∑' i, p i * f (x i) := by
+  simp [discreteMeasure_def, lintegral_sum_measure]
+
 theorem setLIntegral_dirac' {a : α} {f : α → ℝ≥0∞} (hf : Measurable f) {s : Set α}
     (hs : MeasurableSet s) [Decidable (a ∈ s)] :
     ∫⁻ x in s, f x ∂Measure.dirac a = if a ∈ s then f a else 0 := by
@@ -125,7 +132,7 @@ singleton masses. -/
 theorem lintegral_eq_tsum [IsDiscreteMeasure μ] [MeasurableSingletonClass α] (f : α → ℝ≥0∞) :
     ∫⁻ a, f a ∂μ = ∑' a, f a * μ {a} := by
   conv_lhs =>
-    rw [IsDiscreteMeasure.eq_discreteMeasure μ, discreteMeasure_def, lintegral_sum_measure]
+    rw [IsDiscreteMeasure.eq_discreteMeasure μ, lintegral_discreteMeasure]
   simp [mul_comm]
 
 @[deprecated (since := "2026-11-27")] alias lintegral_countable' := lintegral_eq_tsum
