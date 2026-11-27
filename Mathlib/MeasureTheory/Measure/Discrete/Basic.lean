@@ -102,13 +102,6 @@ lemma le_iff [IsDiscreteMeasure μ] : μ ≤ ν ↔ ∀ a, μ {a} ≤ ν {a} :=
 
 end IsDiscreteMeasure
 
-/-- Every measure on a finite space is a finite sum of Dirac measures. -/
--- Use low priority to try structural instances before searching for `Finite α`.
-instance (priority := 100) IsFiniteDiscreteMeasure.of_finite [Finite α] (μ : Measure α) :
-    IsFiniteDiscreteMeasure μ := by
-  obtain ⟨p, hp⟩ := IsDiscreteMeasure.exists_eq_discreteMeasure (μ := μ)
-  exact ⟨⟨p, toFinite _, hp⟩⟩
-
 /-- Two discrete measures are equal if they agree on singletons. -/
 theorem Measure.ext_of_singleton [IsDiscreteMeasure μ] [IsDiscreteMeasure ν]
     (h : ∀ a, μ {a} = ν {a}) : μ = ν :=

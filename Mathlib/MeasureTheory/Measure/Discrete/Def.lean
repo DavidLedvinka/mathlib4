@@ -12,8 +12,7 @@ public import Mathlib.MeasureTheory.Measure.Sum
 # Discrete measures: definitions and algebra
 
 `discreteMeasure p x` is the sum of the weighted Dirac measures at `x i`.
-`IsDiscreteMeasure μ` asserts that `μ` has such a representation, and
-`IsFiniteDiscreteMeasure μ` requires finitely many nonzero coefficients.
+`IsDiscreteMeasure μ` asserts that `μ` has such a representation.
 The coefficients may be infinite.
 
 This file contains the definitions, the algebra of indexed discrete measures, and the
@@ -116,12 +115,6 @@ end DiscreteMeasure
 class IsDiscreteMeasure {α : Type*} [MeasurableSpace α] (μ : Measure α) : Prop where
   exists_eq_discreteMeasure : ∃ p : α → ℝ≥0∞, μ = discreteMeasure p id
 
-/-- A measure that can be written as a finite sum of scaled Dirac measures.
-The coefficients may be infinite, so this does not imply `IsFiniteMeasure`. -/
-class IsFiniteDiscreteMeasure {α : Type*} [MeasurableSpace α] (μ : Measure α) : Prop where
-  exists_eq_discreteMeasure :
-    ∃ p : α → ℝ≥0∞, (support p).Finite ∧ μ = discreteMeasure p id
-
 namespace IsDiscreteMeasure
 
 variable {α ι : Type*} [MeasurableSpace α] {μ ν : Measure α}
@@ -159,65 +152,5 @@ instance finsetSum (s : Finset ι) (μ : ι → Measure α) [∀ i : s, IsDiscre
   infer_instance
 
 end IsDiscreteMeasure
-
-namespace IsFiniteDiscreteMeasure
-
-variable {α ι : Type*} [MeasurableSpace α] {μ ν : Measure α}
-
-instance isDiscreteMeasure [IsFiniteDiscreteMeasure μ] : IsDiscreteMeasure μ := by
-  obtain ⟨p, _, hp⟩ := exists_eq_discreteMeasure (μ := μ)
-  exact ⟨⟨p, hp⟩⟩
-
-lemma of_finite_range (p : ι → ℝ≥0∞) {x : ι → α} (hx : (range x).Finite) :
-    IsFiniteDiscreteMeasure (discreteMeasure p x) := by
-  refine ⟨⟨_, hx.subset ?_, discreteMeasure_eq_discreteMeasure_id p x⟩⟩
-  intro a ha
-  by_contra hax
-  have : IsEmpty (x ⁻¹' {a}) := ⟨fun i ↦ hax ⟨i, i.property⟩⟩
-  simp at ha
-
-instance discreteMeasure [Finite ι] (p : ι → ℝ≥0∞) (x : ι → α) :
-    IsFiniteDiscreteMeasure (discreteMeasure p x) :=
-  of_finite_range p (finite_range x)
-
-lemma of_finite_support {p : ι → ℝ≥0∞} (x : ι → α) (hp : (support p).Finite) :
-    IsFiniteDiscreteMeasure (MeasureTheory.discreteMeasure p x) := by
-  have := hp.to_subtype
-  rw [discreteMeasure_eq_sum_support, ← discreteMeasure_def]
-  infer_instance
-
-instance zero : IsFiniteDiscreteMeasure (0 : Measure α) :=
-  ⟨⟨0, by simp, by simp⟩⟩
-
-instance dirac (a : α) : IsFiniteDiscreteMeasure (Measure.dirac a) := by
-  classical
-  exact ⟨⟨Pi.single a 1, by simp, by simp⟩⟩
-
-instance add [IsFiniteDiscreteMeasure μ] [IsFiniteDiscreteMeasure ν] :
-    IsFiniteDiscreteMeasure (μ + ν) := by
-  obtain ⟨p, hp, rfl⟩ := exists_eq_discreteMeasure (μ := μ)
-  obtain ⟨q, hq, rfl⟩ := exists_eq_discreteMeasure (μ := ν)
-  exact ⟨⟨p + q, (hp.union hq).subset (support_add _ _), (discreteMeasure_add p q id).symm⟩⟩
-
-instance smul {R : Type*} [SMul R ℝ≥0∞] [IsScalarTower R ℝ≥0∞ ℝ≥0∞]
-    (c : R) [IsFiniteDiscreteMeasure μ] : IsFiniteDiscreteMeasure (c • μ) := by
-  obtain ⟨p, hp, rfl⟩ := exists_eq_discreteMeasure (μ := μ)
-  refine ⟨⟨(c • (1 : ℝ≥0∞)) • p, hp.subset (support_const_smul_subset _ _), ?_⟩⟩
-  rw [discreteMeasure_smul, smul_one_smul]
-
-instance sum [Finite ι] (μ : ι → Measure α) [∀ i, IsFiniteDiscreteMeasure (μ i)] :
-    IsFiniteDiscreteMeasure (Measure.sum μ) := by
-  choose p hp hμ using fun i ↦ exists_eq_discreteMeasure (μ := μ i)
-  refine ⟨⟨_, (finite_iUnion hp).subset ?_,
-    (congrArg Measure.sum (funext hμ)).trans (discreteMeasure_tsum p id).symm⟩⟩
-  intro a ha
-  simpa [mem_support, tsum_eq_zero_iff] using ha
-
-instance finsetSum (s : Finset ι) (μ : ι → Measure α) [∀ i : s, IsFiniteDiscreteMeasure (μ i)] :
-    IsFiniteDiscreteMeasure (∑ i ∈ s, μ i) := by
-  rw [← Measure.sum_coe_finset]
-  infer_instance
-
-end IsFiniteDiscreteMeasure
 
 end MeasureTheory
