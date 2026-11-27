@@ -32,10 +32,11 @@ variable {α β ι : Type*} [MeasurableSpace α] [MeasurableSpace β]
 
 namespace Measure
 
-/-- A measure on a countable type is a sum of Dirac measures.
-If `α` has measurable singletons, `sum_smul_dirac` gives a simpler sum. -/
-lemma exists_sum_smul_dirac [Countable α] (μ : Measure α) :
-    ∃ s : Set α, μ = Measure.sum (fun x : s ↦ μ (measurableAtom x) • dirac (x : α)) := by
+/-- Every measure on a countable space has a discrete representation indexed by a subset,
+with coefficients given by the measures of measurable atoms. With null-measurable singletons,
+`IsDiscreteMeasure.eq_discreteMeasure` gives a simpler representation. -/
+lemma exists_eq_discreteMeasure [Countable α] (μ : Measure α) :
+    ∃ s : Set α, μ = discreteMeasure (fun x : s ↦ μ (measurableAtom x)) Subtype.val := by
   let measurableAtoms := measurableAtom '' (Set.univ : Set α)
   have h_nonempty (s : measurableAtoms) : Set.Nonempty s.val := by
     obtain ⟨y, _, hy⟩ := s.property
@@ -44,7 +45,7 @@ lemma exists_sum_smul_dirac [Countable α] (μ : Measure α) :
   let points : measurableAtoms → α := fun s ↦ (h_nonempty s).some
   have h_points_mem (s : measurableAtoms) : points s ∈ s.val := (h_nonempty s).some_mem
   refine ⟨Set.range points, ext_of_measurableAtoms fun x ↦ ?_⟩
-  rw [Measure.sum_apply _ (MeasurableSet.measurableAtom_of_countable x)]
+  rw [discreteMeasure_def, Measure.sum_apply _ (MeasurableSet.measurableAtom_of_countable x)]
   simp only [smul_apply, smul_eq_mul]
   simp_rw [dirac_apply' _ (MeasurableSet.measurableAtom_of_countable x)]
   rw [tsum_eq_single ⟨points ⟨measurableAtom x, by simp [measurableAtoms]⟩, by simp⟩]
@@ -78,8 +79,7 @@ namespace IsDiscreteMeasure
 /-- Every measure on a countable space is discrete, even without measurable singletons. -/
 -- Use low priority to try structural instances before searching for `Countable α`.
 instance (priority := 100) of_countable [Countable α] (μ : Measure α) : IsDiscreteMeasure μ := by
-  obtain ⟨s, hs⟩ := Measure.exists_sum_smul_dirac μ
-  rw [← discreteMeasure_def] at hs
+  obtain ⟨s, hs⟩ := μ.exists_eq_discreteMeasure
   exact ⟨⟨_, hs.trans (discreteMeasure_eq_discreteMeasure_id _ _)⟩⟩
 
 /-- A discrete measure is bounded by any measure that dominates its singleton masses. -/
@@ -152,19 +152,12 @@ lemma IsDiscreteMeasure.eq_discreteMeasure (μ : Measure α) [IsDiscreteMeasure 
   obtain ⟨p, rfl⟩ := IsDiscreteMeasure.exists_eq_discreteMeasure (μ := μ)
   simp
 
-/-- A discrete measure with null-measurable singletons is a sum of Dirac measures. -/
+/-- Reconstructing a discrete measure from its singleton masses gives the original measure. -/
 @[simp]
-theorem Measure.sum_smul_dirac (μ : Measure α) [IsDiscreteMeasure μ]
+lemma discreteMeasure_measure_singleton (μ : Measure α) [IsDiscreteMeasure μ]
     [MeasurableSingletonClass (NullMeasurableSpace α μ)] :
-    (sum fun a ↦ μ {a} • dirac a) = μ :=
+    discreteMeasure (fun a ↦ μ {a}) id = μ :=
   (IsDiscreteMeasure.eq_discreteMeasure μ).symm
-
-/-- The sum of scaled Dirac measures applied to a null-measurable singleton is its coefficient. -/
-lemma Measure.sum_smul_dirac_singleton {f : α → ℝ≥0∞} {a : α}
-    [MeasurableSingletonClass (NullMeasurableSpace α (sum fun b ↦ f b • dirac b))] :
-    sum (fun b ↦ f b • dirac b) {a} = f a :=
-  discreteMeasure_id_apply_singleton₀
-    (nullMeasurableSet_singleton (μ := sum fun b ↦ f b • dirac b) a)
 
 lemma map_discreteMeasure₀ {f : α → β} (hf : AEMeasurable f (discreteMeasure p x)) :
     (discreteMeasure p x).map f = discreteMeasure p (f ∘ x) := by
@@ -182,17 +175,17 @@ instance IsDiscreteMeasure.map (μ : Measure α) [IsDiscreteMeasure μ] (f : α 
     split_ifs <;> infer_instance
 
 /-- A discrete pushforward with null-measurable singletons is determined by its fibers. -/
-theorem Measure.map_eq_sum₀ (μ : Measure α) (f : α → β) [IsDiscreteMeasure (μ.map f)]
+theorem Measure.map_eq_discreteMeasure₀ (μ : Measure α) (f : α → β) [IsDiscreteMeasure (μ.map f)]
     [MeasurableSingletonClass (NullMeasurableSpace β (μ.map f))] (hf : AEMeasurable f μ) :
-    μ.map f = sum fun b ↦ μ (f ⁻¹' {b}) • dirac b := by
-  rw [IsDiscreteMeasure.eq_discreteMeasure (μ.map f), discreteMeasure_def]
+    μ.map f = discreteMeasure (fun b ↦ μ (f ⁻¹' {b})) id := by
+  rw [IsDiscreteMeasure.eq_discreteMeasure (μ.map f)]
   simp [map_apply₀ hf (nullMeasurableSet_singleton _)]
 
 /-- A discrete pushforward with null-measurable singletons is determined by its fibers. -/
-theorem Measure.map_eq_sum (μ : Measure α) (f : α → β) [IsDiscreteMeasure (μ.map f)]
+theorem Measure.map_eq_discreteMeasure (μ : Measure α) (f : α → β) [IsDiscreteMeasure (μ.map f)]
     [MeasurableSingletonClass (NullMeasurableSpace β (μ.map f))] (hf : Measurable f) :
-    μ.map f = sum fun b ↦ μ (f ⁻¹' {b}) • dirac b :=
-  μ.map_eq_sum₀ f hf.aemeasurable
+    μ.map f = discreteMeasure (fun b ↦ μ (f ⁻¹' {b})) id :=
+  μ.map_eq_discreteMeasure₀ f hf.aemeasurable
 
 /-- A discrete measure with null-measurable singletons evaluates a null-measurable set by
 summing its singleton masses. -/
@@ -208,5 +201,35 @@ theorem Measure.tsum_indicator_apply_singleton (μ : Measure α) [IsDiscreteMeas
     [MeasurableSingletonClass (NullMeasurableSpace α μ)] (s : Set α) (hs : MeasurableSet s) :
     (∑' x, s.indicator (fun x ↦ μ {x}) x) = μ s :=
   μ.tsum_indicator_apply_singleton₀ s hs.nullMeasurableSet
+
+@[deprecated Measure.exists_eq_discreteMeasure +typeChanged (since := "2026-11-27")]
+lemma Measure.exists_sum_smul_dirac [Countable α] (μ : Measure α) :
+    ∃ s : Set α, μ = sum (fun x : s ↦ μ (measurableAtom x) • dirac (x : α)) :=
+  μ.exists_eq_discreteMeasure
+
+@[deprecated discreteMeasure_measure_singleton +typeChanged (since := "2026-11-27")]
+theorem Measure.sum_smul_dirac (μ : Measure α) [IsDiscreteMeasure μ]
+    [MeasurableSingletonClass (NullMeasurableSpace α μ)] :
+    (sum fun a ↦ μ {a} • dirac a) = μ :=
+  discreteMeasure_measure_singleton μ
+
+@[deprecated discreteMeasure_id_apply_singleton +typeChanged (since := "2026-11-27")]
+lemma Measure.sum_smul_dirac_singleton {f : α → ℝ≥0∞} {a : α}
+    [MeasurableSingletonClass (NullMeasurableSpace α (sum fun b ↦ f b • dirac b))] :
+    sum (fun b ↦ f b • dirac b) {a} = f a :=
+  discreteMeasure_id_apply_singleton₀
+    (nullMeasurableSet_singleton (μ := sum fun b ↦ f b • dirac b) a)
+
+@[deprecated Measure.map_eq_discreteMeasure₀ +typeChanged (since := "2026-11-27")]
+theorem Measure.map_eq_sum₀ (μ : Measure α) (f : α → β) [IsDiscreteMeasure (μ.map f)]
+    [MeasurableSingletonClass (NullMeasurableSpace β (μ.map f))] (hf : AEMeasurable f μ) :
+    μ.map f = sum fun b ↦ μ (f ⁻¹' {b}) • dirac b :=
+  μ.map_eq_discreteMeasure₀ f hf
+
+@[deprecated Measure.map_eq_discreteMeasure +typeChanged (since := "2026-11-27")]
+theorem Measure.map_eq_sum (μ : Measure α) (f : α → β) [IsDiscreteMeasure (μ.map f)]
+    [MeasurableSingletonClass (NullMeasurableSpace β (μ.map f))] (hf : Measurable f) :
+    μ.map f = sum fun b ↦ μ (f ⁻¹' {b}) • dirac b :=
+  μ.map_eq_discreteMeasure f hf
 
 end MeasureTheory

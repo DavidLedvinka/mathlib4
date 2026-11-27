@@ -695,8 +695,8 @@ alias sFinite_of_absolutelyContinuous := sfinite_of_absolutelyContinuous
 
 /-- In a countable space, every measure is s-finite. -/
 instance [Countable α] : SFinite μ := by
-  obtain ⟨s, h⟩ := exists_sum_smul_dirac μ
-  rw [h]
+  obtain ⟨s, h⟩ := μ.exists_eq_discreteMeasure
+  rw [h, discreteMeasure_def]
   infer_instance
 
 end SFinite

@@ -121,7 +121,8 @@ section Countable
 
 theorem lintegral_countable' [Countable α] [MeasurableSingletonClass α] (f : α → ℝ≥0∞) :
     ∫⁻ a, f a ∂μ = ∑' a, f a * μ {a} := by
-  conv_lhs => rw [← sum_smul_dirac μ, lintegral_sum_measure]
+  conv_lhs =>
+    rw [IsDiscreteMeasure.eq_discreteMeasure μ, discreteMeasure_def, lintegral_sum_measure]
   congr 1 with a : 1
   simp [mul_comm]
 

@@ -182,10 +182,10 @@ variable [CompleteSpace E] [MeasurableSingletonClass X] {μ : Measure X}
 
 theorem integral_countable [Countable X] (hf : Integrable f μ) :
     ∫ x, f x ∂μ = ∑' x, μ.real {x} • f x := by
-  rw [← Measure.sum_smul_dirac μ] at hf
-  rw [← Measure.sum_smul_dirac μ, integral_sum_measure hf]
-  congr 1 with a : 1
-  rw [integral_smul_measure, integral_dirac, Measure.sum_smul_dirac, measureReal_def]
+  rw [IsDiscreteMeasure.eq_discreteMeasure μ, discreteMeasure_def] at hf
+  conv_lhs =>
+    rw [IsDiscreteMeasure.eq_discreteMeasure μ, discreteMeasure_def, integral_sum_measure hf]
+  simp [integral_smul_measure, integral_dirac, measureReal_def]
 
 theorem setIntegral_countable (f : X → E) {s : Set X} (hs : s.Countable) (hf : IntegrableOn f s μ) :
     ∫ x in s, f x ∂μ = ∑' x : s, μ.real {(x : X)} • f x := by
