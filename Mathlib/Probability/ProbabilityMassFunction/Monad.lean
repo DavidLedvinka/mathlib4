@@ -93,7 +93,7 @@ theorem toMeasure_pure : (pure a).toMeasure = Measure.dirac a :=
   Measure.ext fun s hs => by rw [toMeasure_pure_apply a s hs, Measure.dirac_apply' a hs]; rfl
 
 @[simp]
-theorem toPMF_dirac [Countable α] [h : MeasurableSingletonClass α] :
+theorem toPMF_dirac [h : MeasurableSingletonClass α] :
     (Measure.dirac a).toPMF = pure a := by
   rw [toPMF_eq_iff_toMeasure_eq, toMeasure_pure]
 

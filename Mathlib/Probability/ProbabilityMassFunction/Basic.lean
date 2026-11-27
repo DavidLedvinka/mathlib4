@@ -26,8 +26,8 @@ by assigning each set the sum of the probabilities of each of its elements.
 Under this outer measure, every set is Carathéodory-measurable,
 so we can further extend this to a `Measure` on `α`, see `PMF.toMeasure`.
 `PMF.toMeasure.isProbabilityMeasure` shows this associated measure is a probability measure.
-Conversely, given a probability measure `μ` on a measurable space `α` with all singleton sets
-measurable, `μ.toPMF` constructs a `PMF` on `α`, setting the probability mass of a point `x`
+Conversely, given a discrete probability measure `μ` with all singleton sets
+null-measurable, `μ.toPMF` constructs a `PMF` on `α`, setting the probability mass of a point `x`
 to be the measure of the singleton set `{x}`.
 
 ## Tags
@@ -229,6 +229,15 @@ theorem toMeasure_apply_eq_toOuterMeasure_apply (hs : MeasurableSet s) :
 theorem toMeasure_apply (hs : MeasurableSet s) : p.toMeasure s = ∑' x, s.indicator p x :=
   (p.toMeasure_apply_eq_toOuterMeasure_apply hs).trans (p.toOuterMeasure_apply s)
 
+/-- The measure associated to a probability mass function is its discrete measure. -/
+theorem toMeasure_eq_discreteMeasure : p.toMeasure = discreteMeasure p id := by
+  ext s hs
+  simp [toMeasure_apply _ hs, discreteMeasure_def, hs, Set.indicator, mul_ite]
+
+instance toMeasure.isDiscreteMeasure : IsDiscreteMeasure p.toMeasure := by
+  rw [toMeasure_eq_discreteMeasure]
+  infer_instance
+
 theorem toMeasure_apply_singleton (a : α) (h : MeasurableSet ({a} : Set α)) :
     p.toMeasure {a} = p a := by
   simp [p.toMeasure_apply_eq_toOuterMeasure_apply h, toOuterMeasure_apply_singleton]
@@ -302,29 +311,22 @@ open PMF
 
 namespace Measure
 
-/-- Given that `α` is a countable, measurable space with all singleton sets measurable,
-we can convert any probability measure into a `PMF`, where the mass of a point
-is the measure of the singleton set under the original measure. -/
-def toPMF [Countable α] [MeasurableSpace α] [MeasurableSingletonClass α] (μ : Measure α)
-    [h : IsProbabilityMeasure μ] : PMF α :=
-  ⟨fun x => μ ({x} : Set α),
-    summable.hasSum_iff.2
-      (_root_.trans
-        (symm <|
-          (tsum_indicator_apply_singleton μ Set.univ MeasurableSet.univ).symm.trans
-            (tsum_congr fun x => congr_fun (Set.indicator_univ _) x))
-        h.measure_univ)⟩
+/-- A discrete probability measure with null-measurable singletons defines a `PMF`,
+with mass at each point given by the measure of its singleton. -/
+def toPMF [MeasurableSpace α] (μ : Measure α) [IsDiscreteMeasure μ]
+    [MeasurableSingletonClass (NullMeasurableSpace α μ)] [IsProbabilityMeasure μ] : PMF α := by
+  refine ⟨fun x ↦ μ {x}, summable.hasSum_iff.mpr ?_⟩
+  rw [← discreteMeasure_univ _ id, discreteMeasure_measure_singleton, measure_univ]
 
-variable [Countable α] [MeasurableSpace α] [MeasurableSingletonClass α] (μ : Measure α)
-  [IsProbabilityMeasure μ]
+variable [MeasurableSpace α] (μ : Measure α) [IsDiscreteMeasure μ]
+  [MeasurableSingletonClass (NullMeasurableSpace α μ)] [IsProbabilityMeasure μ]
 
 theorem toPMF_apply (x : α) : μ.toPMF x = μ {x} := rfl
 
 @[simp]
-theorem toPMF_toMeasure : μ.toPMF.toMeasure = μ :=
-  Measure.ext fun s hs => by
-    rw [μ.toPMF.toMeasure_apply hs, ← μ.tsum_indicator_apply_singleton s hs]
-    rfl
+theorem toPMF_toMeasure : μ.toPMF.toMeasure = μ := by
+  rw [PMF.toMeasure_eq_discreteMeasure]
+  exact discreteMeasure_measure_singleton μ
 
 end Measure
 
@@ -339,17 +341,17 @@ instance toMeasure.isProbabilityMeasure [MeasurableSpace α] (p : PMF α) :
     simpa only [MeasurableSet.univ, toMeasure_apply_eq_toOuterMeasure_apply, Set.indicator_univ,
       toOuterMeasure_apply, ENNReal.coe_eq_one] using tsum_coe p⟩
 
-variable [Countable α] [MeasurableSpace α] [MeasurableSingletonClass α] (p : PMF α)
+variable [MeasurableSpace α] [MeasurableSingletonClass α] (p : PMF α)
 
 @[simp]
 theorem toMeasure_toPMF : p.toMeasure.toPMF = p :=
   PMF.ext fun x => by
     rw [← p.toMeasure_apply_singleton x (measurableSet_singleton x), p.toMeasure.toPMF_apply]
 
-theorem toMeasure_eq_iff_eq_toPMF (μ : Measure α) [IsProbabilityMeasure μ] :
+theorem toMeasure_eq_iff_eq_toPMF (μ : Measure α) [IsDiscreteMeasure μ] [IsProbabilityMeasure μ] :
     p.toMeasure = μ ↔ p = μ.toPMF := by rw [← toMeasure_inj, Measure.toPMF_toMeasure]
 
-theorem toPMF_eq_iff_toMeasure_eq (μ : Measure α) [IsProbabilityMeasure μ] :
+theorem toPMF_eq_iff_toMeasure_eq (μ : Measure α) [IsDiscreteMeasure μ] [IsProbabilityMeasure μ] :
     μ.toPMF = p ↔ μ = p.toMeasure := by rw [← toMeasure_inj, Measure.toPMF_toMeasure]
 
 end PMF

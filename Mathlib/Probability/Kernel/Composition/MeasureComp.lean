@@ -37,11 +37,14 @@ of two kernels, which allows to transfer properties of `∘ₖ` to `∘ₘ`. -/
 lemma comp_eq_comp_const_apply : κ ∘ₘ μ = (κ ∘ₖ (Kernel.const Unit μ)) () := by
   rw [Kernel.comp_apply, Kernel.const_apply]
 
-lemma comp_eq_sum_of_countable [Countable α] [MeasurableSingletonClass α] :
+/-- Composing a discrete measure with a kernel gives a sum weighted by its singleton masses. -/
+lemma comp_eq_sum [IsDiscreteMeasure μ] [MeasurableSingletonClass α] :
     κ ∘ₘ μ = Measure.sum (fun ω ↦ μ {ω} • κ ω) := by
   ext s hs
   rw [Measure.sum_apply _ hs, Measure.bind_apply hs (by fun_prop)]
   simp [lintegral_eq_tsum, mul_comm]
+
+@[deprecated (since := "2026-11-27")] alias comp_eq_sum_of_countable := comp_eq_sum
 
 @[simp]
 lemma snd_compProd (μ : Measure α) [SFinite μ] (κ : Kernel α β) [IsSFiniteKernel κ] :
@@ -181,7 +184,7 @@ lemma AbsolutelyContinuous.comp (hμν : μ ≪ ν) (hκη : ∀ᵐ a ∂μ, κ 
 
 lemma absolutelyContinuous_comp_of_countable [Countable α] [MeasurableSingletonClass α] :
     ∀ᵐ ω ∂μ, κ ω ≪ κ ∘ₘ μ := by
-  rw [Measure.comp_eq_sum_of_countable, ae_iff_of_countable]
+  rw [Measure.comp_eq_sum, ae_iff_of_countable]
   exact fun ω hμω ↦ Measure.absolutelyContinuous_sum_right ω (Measure.absolutelyContinuous_smul hμω)
 
 end AbsolutelyContinuous
