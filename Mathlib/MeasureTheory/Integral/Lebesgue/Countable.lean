@@ -8,6 +8,7 @@ module
 public import Mathlib.MeasureTheory.Integral.Lebesgue.Map
 public import Mathlib.MeasureTheory.Integral.Lebesgue.Markov
 public import Mathlib.MeasureTheory.Measure.Count
+public import Mathlib.MeasureTheory.Measure.Discrete.Basic
 
 /-!
 # Lebesgue integral over finite and countable types, sets and measures

@@ -8,6 +8,7 @@ module
 public import Mathlib.Probability.Distributions.SetBernoulli
 
 import Mathlib.MeasureTheory.MeasurableSpace.NCard
+import Mathlib.MeasureTheory.Measure.Discrete.Real
 import Mathlib.Order.Interval.Set.Nat
 
 /-!

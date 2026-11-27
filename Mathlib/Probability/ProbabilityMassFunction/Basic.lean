@@ -6,6 +6,7 @@ Authors: Johannes Hölzl, Devon Tuma
 module
 
 public import Mathlib.MeasureTheory.Measure.Dirac.Basic
+public import Mathlib.MeasureTheory.Measure.Discrete.Basic
 
 set_option doc.verso true
 set_option doc.verso.suggestions false

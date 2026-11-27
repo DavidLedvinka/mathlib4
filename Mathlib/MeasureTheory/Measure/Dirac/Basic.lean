@@ -6,6 +6,7 @@ Authors: Johannes Hölzl
 module
 
 public import Mathlib.MeasureTheory.MeasurableSpace.CountablyGenerated
+public import Mathlib.MeasureTheory.Measure.Dirac.Restrict
 public import Mathlib.MeasureTheory.Measure.MutuallySingular
 public import Mathlib.MeasureTheory.Measure.Typeclasses.NullSingletonClass
 public import Mathlib.MeasureTheory.Measure.Typeclasses.Probability
@@ -48,102 +49,6 @@ lemma map_const (μ : Measure α) (c : β) : μ.map (fun _ ↦ c) = (μ Set.univ
   by_cases hsc : c ∈ s
   · rw [(Set.indicator_eq_one_iff_mem _).mpr hsc, mul_one, ite_eq_left hsc]
   · rw [ite_eq_right hsc, (Set.indicator_eq_zero_iff_notMem _).mpr hsc, measure_empty, mul_zero]
-
-@[simp]
-theorem restrict_singleton (μ : Measure α) (a : α) : μ.restrict {a} = μ {a} • dirac a := by
-  ext1 s hs
-  by_cases ha : a ∈ s
-  · have : s ∩ {a} = {a} := by simpa
-    simp [*]
-  · have : s ∩ {a} = ∅ := inter_singleton_eq_empty.2 ha
-    simp [*]
-
-/-- Two measures on a countable space are equal if they agree on singletons. -/
-theorem ext_of_singleton [Countable α] {μ ν : Measure α} (h : ∀ a, μ {a} = ν {a}) : μ = ν :=
-  ext_of_sUnion_eq_univ (countable_range singleton) (by aesop) (by simp_all)
-
-/-- Two measures on a countable space are equal if and only if they agree on singletons. -/
-theorem ext_iff_singleton [Countable α] {μ ν : Measure α} : μ = ν ↔ ∀ a, μ {a} = ν {a} :=
-  ⟨fun h _ ↦ h ▸ rfl, ext_of_singleton⟩
-
-theorem _root_.MeasureTheory.ext_iff_measureReal_singleton [Countable α]
-    {μ1 μ2 : Measure α} [SigmaFinite μ1] [SigmaFinite μ2] :
-    μ1 = μ2 ↔ ∀ x, μ1.real {x} = μ2.real {x} := by
-  rw [Measure.ext_iff_singleton]
-  congr! with x
-  rw [measureReal_def, measureReal_def, ENNReal.toReal_eq_toReal_iff]
-  simp [measure_singleton_lt_top, ne_of_lt]
-
-alias ⟨_, ext_of_measureReal_singleton⟩ := MeasureTheory.ext_iff_measureReal_singleton
-
-/-- If `f` is a map with countable codomain, then `μ.map f` is a sum of Dirac measures. -/
-theorem map_eq_sum [Countable β] [MeasurableSingletonClass β] (μ : Measure α) (f : α → β)
-    (hf : Measurable f) : μ.map f = sum fun b : β => μ (f ⁻¹' {b}) • dirac b := by
-  ext s
-  have : ∀ y ∈ s, MeasurableSet (f ⁻¹' {y}) := fun y _ => hf (measurableSet_singleton _)
-  simp [← tsum_measure_preimage_singleton (to_countable s) this, *,
-    tsum_subtype s fun b => μ (f ⁻¹' {b}), ← indicator_mul_right s fun b => μ (f ⁻¹' {b})]
-
-/-- A measure on a countable type is a sum of Dirac measures. -/
-@[simp]
-theorem sum_smul_dirac [Countable α] [MeasurableSingletonClass α] (μ : Measure α) :
-    (sum fun a => μ {a} • dirac a) = μ := by simpa using (map_eq_sum μ id measurable_id).symm
-
-/-- The sum of scaled Dirac measures applied to a singleton is the coefficient of that singleton. -/
-lemma sum_smul_dirac_singleton [MeasurableSingletonClass α] {f : α → ℝ≥0∞} {a : α} :
-    sum (fun b : α ↦ f b • dirac b) {a} = f a := by
-  simp +contextual [tsum_eq_single a]
-
-/-- A measure on a countable type is a sum of Dirac measures.
-If `α` has measurable singletons, `sum_smul_dirac` gives a simpler sum. -/
-lemma exists_sum_smul_dirac [Countable α] (μ : Measure α) :
-    ∃ s : Set α, μ = Measure.sum (fun x : s ↦ μ (measurableAtom x) • dirac (x : α)) := by
-  let measurableAtoms := measurableAtom '' (Set.univ : Set α)
-  have h_nonempty (s : measurableAtoms) : Set.Nonempty s.val := by
-    obtain ⟨y, _, hy⟩ := s.property
-    rw [← hy]
-    exact ⟨y, mem_measurableAtom_self y⟩
-  let points : measurableAtoms → α := fun s ↦ (h_nonempty s).some
-  have h_points_mem (s : measurableAtoms) : points s ∈ s.val := (h_nonempty s).some_mem
-  refine ⟨Set.range points, ext_of_measurableAtoms fun x ↦ ?_⟩
-  rw [Measure.sum_apply _ (MeasurableSet.measurableAtom_of_countable x)]
-  simp only [smul_apply, smul_eq_mul]
-  simp_rw [dirac_apply' _ (MeasurableSet.measurableAtom_of_countable x)]
-  rw [tsum_eq_single ⟨points ⟨measurableAtom x, by simp [measurableAtoms]⟩, by simp⟩]
-  · rw [indicator_of_mem]
-    · simp only [Pi.one_apply, mul_one]
-      congr 1
-      refine (measurableAtom_eq_of_mem ?_).symm
-      convert! h_points_mem _
-      simp
-    · convert! h_points_mem _
-      simp
-  · simp only [ne_eq, mul_eq_zero, indicator_apply_eq_zero, Pi.one_apply, one_ne_zero, imp_false,
-      Subtype.forall, Set.mem_range, Subtype.exists, Subtype.mk.injEq, forall_exists_index]
-    refine fun y s hs hsy hyx ↦ .inr fun hyx' ↦ hyx ?_
-    rw [← hsy]
-    congr
-    have h1 : measurableAtom y = measurableAtom x := measurableAtom_eq_of_mem hyx'
-    have h2 : measurableAtom y = s := by
-      specialize h_points_mem ⟨s, hs⟩
-      obtain ⟨z, _, hz⟩ := hs
-      simp only at h_points_mem
-      rw [← hz, ← hsy]
-      refine measurableAtom_eq_of_mem ?_
-      convert! h_points_mem
-    rw [← h2, h1]
-
-/-- Given that `α` is a countable, measurable space with all singleton sets measurable,
-write the measure of a set `s` as the sum of the measure of `{x}` for all `x ∈ s`. -/
-theorem tsum_indicator_apply_singleton [Countable α] [MeasurableSingletonClass α] (μ : Measure α)
-    (s : Set α) (hs : MeasurableSet s) : (∑' x : α, s.indicator (fun x => μ {x}) x) = μ s := by
-  classical
-  calc
-    (∑' x : α, s.indicator (fun x => μ {x}) x) =
-      Measure.sum (fun a => μ {a} • Measure.dirac a) s := by
-      simp only [Measure.sum_apply _ hs, smul_apply, smul_eq_mul, Measure.dirac_apply,
-        Set.indicator_apply, mul_ite, Pi.one_apply, mul_one, mul_zero]
-    _ = μ s := by rw [μ.sum_smul_dirac]
 
 end Measure
 

@@ -38,6 +38,10 @@ instance : MeasureSpace PUnit :=
 theorem le_dirac_apply {a} : s.indicator 1 a ≤ dirac a s :=
   OuterMeasure.dirac_apply a s ▸ le_toMeasure_apply _ _ _
 
+theorem dirac_apply₀ (a : α) (hs : NullMeasurableSet s (dirac a)) :
+    dirac a s = s.indicator 1 a :=
+  toMeasure_apply₀ _ _ hs
+
 @[simp]
 theorem dirac_apply' (a : α) (hs : MeasurableSet s) : dirac a s = s.indicator 1 a :=
   toMeasure_apply _ _ hs
